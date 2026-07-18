@@ -75,19 +75,22 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# PARSING INCOMING CLEAN DATA FRAME
+# PARSING INCOMING REAL TIME GEOLOCATION PAYLOADS
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
     
     try:
+        # String data structure input: TX_REF:BB400000^FINAL_AMT:₹500^LOC:Ranchi
         segmented_nodes = raw_payload_wire.split("^")
         extracted_tx_code = segmented_nodes[0].split(":")[1]
         extracted_final_bill = segmented_nodes[1].split(":")[1]
+        extracted_location = segmented_nodes[2].split(":")[1]
         
         compiled_receipt = "🎉 **Order Placed Successfully!**\n"
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += f"🆔 **Order ID:** `{extracted_tx_code}`\n"
         compiled_receipt += f"💵 **Total Payment Due:** **{extracted_final_bill}**\n"
+        compiled_receipt += f"📍 **Real-Time GPS Address:**\n`{extracted_location}`\n"
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
@@ -169,4 +172,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-            
+    

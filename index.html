@@ -105,6 +105,8 @@
         .nav-tab-node.active { color: var(--bb-green); }
         .nav-tab-icon { font-size: 18px; }
         .nav-tab-lbl { font-size: 10px; font-weight: 700; }
+        
+        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -114,8 +116,8 @@
         <div class="delivery-row">
             <div>
                 <div class="eta-badge">⚡ 5 mins</div>
-                <!-- Interactive real location handler -->
-                <div class="location-dropdown" id="loc-lbl" onclick="requestTelegramGPS()">Requesting Location...</div>
+                <!-- Default clean address text, click karne par secure dynamic prompt chalega -->
+                <div class="location-dropdown" id="loc-lbl" onclick="requestTelegramGPS()">Ranchi, India</div>
             </div>
             <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
         </div>
@@ -214,7 +216,7 @@
 
         let applicationCart = {};
         let localizedBillSum = 0;
-        let finalGeoString = "Ranchi, Jharkhand"; // Default safe target
+        let finalGeoString = "Ranchi, Jharkhand";
 
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const runtimeUser = tg.initDataUnsafe.user;
@@ -224,12 +226,11 @@
             document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
-        // --- ASLI TELEGRAM BLUE DIALOG BOX REQUEST METHOD ---
+        // --- SECURE FREEZE-PROOF TELEGRAM GEOLOCATION ACCESS ---
         function requestTelegramGPS() {
             const labelNode = document.getElementById('loc-lbl');
-            labelNode.innerText = "Requesting System GPS...";
+            labelNode.innerText = "Requesting GPS...";
 
-            // standard HTML5 geolocation interface call directly to handle phone mocked GPS engines properly
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     async (pos) => {
@@ -237,14 +238,14 @@
                         const longitude = pos.coords.longitude;
                         
                         finalGeoString = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-                        labelNode.innerText = `📍 Fixed: ${finalGeoString}`;
+                        labelNode.innerText = `📍 Mock Fixed: ${finalGeoString}`;
                         
-                        // Parse mock coordinates details via public reverse lookup pipeline
+                        // Parse mock coordinates info via Osm Map
                         try {
                             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
                             const osmData = await res.json();
                             if (osmData && osmData.address) {
-                                const district = osmData.address.suburb || osmData.address.neighbourhood || osmData.address.city_district || "";
+                                const district = osmData.address.suburb || osmData.address.neighbourhood || osmData.address.suburb || "";
                                 const locationName = osmData.address.city || osmData.address.town || "Mumbai";
                                 const finalDisplay = `${district} ${locationName}`.trim();
                                 labelNode.innerText = finalDisplay.length > 28 ? finalDisplay.substring(0, 26) + "..." : finalDisplay;
@@ -253,11 +254,14 @@
                         } catch(e) { console.log("Lookup failure bypass active."); }
                     },
                     (err) => {
-                        labelNode.innerText = "Ranchi, Jharkhand (Default)";
-                        tg.showAlert("Please check device GPS configurations or mock options.");
+                        // User ne allow nahi kiya ya error aaya toh freeze nahi hoga, fallback values set ho jayengi
+                        labelNode.innerText = "Ranchi, India";
+                        tg.showAlert("Location access denied or timed out.");
                     },
-                    { enableHighAccuracy: true, timeout: 6000 }
+                    { enableHighAccuracy: true, timeout: 5000 }
                 );
+            } else {
+                labelNode.innerText = "Ranchi, India";
             }
         }
 
@@ -291,8 +295,6 @@
             const searchVal = document.getElementById('bb-search-box').value.trim().toLowerCase();
             if(!searchVal) return;
 
-            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Processing internal Scraper lookup hooks...</div>';
+            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Syncing with BigBasket Data Nodes...</div>';
 
-            const fallbackCatalog = {
-                "biscuit": [
-                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigba
+        

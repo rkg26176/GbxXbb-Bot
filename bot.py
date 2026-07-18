@@ -89,7 +89,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += f"🆔 **Order ID:** `{extracted_tx_code}`\n"
         compiled_receipt += f"💵 **Total Payment Due:** **{extracted_final_bill}**\n"
-        compiled_receipt += f"📍 **Verified Mock/Live GPS Target:**\n`{extracted_location}`\n"
+        compiled_receipt += f"📍 **Delivery Location Context:**\n`{extracted_location}`\n"
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
@@ -171,3 +171,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+    

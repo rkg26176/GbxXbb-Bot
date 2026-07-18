@@ -75,7 +75,7 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# PARSING INCOMING SECURE METADATA PAYLOAD WIRE
+# PARSING INCOMING SECURE METADATA PAYLOAD WIRE WITH LIVE MAP COORDINATES
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
     
@@ -89,7 +89,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += f"🆔 **Order ID:** `{extracted_tx_code}`\n"
         compiled_receipt += f"💵 **Total Payment Due:** **{extracted_final_bill}**\n"
-        compiled_receipt += f"📍 **Delivery Coordinates / Location:**\n`{extracted_location}`\n"
+        compiled_receipt += f"📍 **Verified Mock/Live GPS Target:**\n`{extracted_location}`\n"
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
@@ -99,7 +99,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         logging.error(f"Text processing wire parsing error: {data_err}")
         await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Summary Data Payload:* {raw_payload_wire}")
 
-# --- FASTAPI SERVER MODULE & REVERSE PROXY SCRAPER LOGICS ---
+# --- FASTAPI SERVER MODULE & APIS ---
 api_app = FastAPI()
 
 @api_app.get("/")
@@ -171,4 +171,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    

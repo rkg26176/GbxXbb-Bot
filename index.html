@@ -3,180 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BigBasket Live Store</title>
-    <!-- Telegram Mini App Core Script -->
+    <title>bigbasket - Online Grocery</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --bb-green: #84c225;
-            --bb-dark: #333333;
-            --bg-light: #f6f6f6;
+            --bb-dark-green: #689f1e;
+            --text-main: #222222;
+            --text-muted: #777777;
+            --bg-body: #f4f3f2;
+            --border-color: #e8e7e6;
         }
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-light);
-            color: var(--bb-dark);
-        }
-        .header {
-            background: white;
-            padding: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .top-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .logo {
-            font-size: 20px;
-            font-weight: bold;
-            color: var(--bb-green);
-        }
-        .basket-badge {
-            background: var(--bb-green);
-            color: white;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-        }
-        .search-container {
-            display: flex;
-            gap: 8px;
-        }
-        .search-input {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .search-btn {
-            background: var(--bb-green);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .container {
-            padding: 15px;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 80px;
-        }
-        .product-card {
-            background: white;
-            border-radius: 8px;
-            padding: 12px;
-            border: 1px solid #eee;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .product-img {
-            width: 100%;
-            height: 100px;
-            object-fit: contain;
-        }
-        .product-title {
-            font-size: 13px;
-            font-weight: 600;
-            margin: 5px 0;
-            height: 36px;
-            overflow: hidden;
-        }
-        .product-price {
-            font-size: 15px;
-            font-weight: bold;
-            margin: 5px 0;
-        }
-        .add-btn {
-            background: #fff;
-            color: #ff3f6c;
-            border: 1px solid #efefef;
-            padding: 8px;
-            border-radius: 4px;
-            font-weight: bold;
-            width: 100%;
-            cursor: pointer;
-        }
-        .qty-layout {
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bb-green);
-            color: white;
-            border-radius: 4px;
-        }
-        .qty-btn {
-            background: transparent;
-            border: none;
-            color: white;
-            padding: 8px 12px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .footer-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 -3px 10px rgba(0,0,0,0.05);
-        }
-        .view-cart-btn {
-            background: var(--bb-green);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .status-msg {
-            text-align: center;
-            grid-column: span 2;
-            padding: 20px;
-            color: #666;
-        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { margin: 0; background-color: var(--bg-body); color: var(--text-main); padding-bottom: 90px; }
+        
+        /* Premium Top Header */
+        .bb-nav { background: white; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
+        .brand-logo { font-size: 22px; font-weight: 900; color: var(--bb-green); letter-spacing: -0.5px; }
+        
+        /* Location Selector & Profile Grid */
+        .sub-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: #fdfdfd; font-size: 13px; border-bottom: 1px solid var(--border-color); }
+        .location-selector { display: flex; align-items: center; color: var(--bb-dark-green); font-weight: 600; cursor: pointer; }
+        .location-selector::before { content: "📍"; margin-right: 4px; }
+        .profile-section { display: flex; align-items: center; font-weight: bold; color: #444; }
+        .profile-avatar { width: 24px; height: 24px; background: #ddd; border-radius: 50%; margin-right: 6px; display: inline-block; text-align: center; line-height: 24px; font-size: 11px; }
+
+        /* Modern Search Input Container */
+        .search-box-wrapper { padding: 12px 16px; background: white; }
+        .search-bar-inner { display: flex; background: #f0f2f5; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden; }
+        .search-input { flex: 1; border: none; background: transparent; padding: 10px 12px; font-size: 14px; outline: none; }
+        .search-submit-btn { background: var(--bb-green); color: white; border: none; padding: 0 18px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .search-submit-btn:hover { background: var(--bb-dark-green); }
+
+        /* Horizontal Fast Category Sliders */
+        .categories-slider { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; background: white; margin-bottom: 8px; scrollbar-width: none; }
+        .categories-slider::-webkit-scrollbar { display: none; }
+        .cat-chip { background: #f5f5f5; padding: 6px 14px; border-radius: 15px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid #e0e0e0; cursor: pointer; }
+        .cat-chip.active { background: var(--bb-green); color: white; border-color: var(--bb-green); }
+
+        /* Modern 2-Column Product Grid */
+        .main-container { padding: 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .item-card { background: white; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e9e9e9; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: relative; }
+        .img-container { width: 100%; height: 110px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; background: #fafafa; border-radius: 4px; overflow: hidden; }
+        .item-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        .brand-name { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 2px; }
+        .item-title { font-size: 13px; font-weight: 500; color: #333; line-height: 1.3; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 8px; }
+        
+        .pricing-row { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 6px; }
+        .price-val { font-size: 16px; font-weight: 700; color: #000; }
+        
+        /* Asli App Style ADD Button & Qty Controller */
+        .action-box { width: 75px; height: 30px; position: relative; }
+        .card-add-btn { width: 100%; height: 100%; background: white; color: #ff3f6c; border: 1px solid #ff3f6c; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer; text-transform: uppercase; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .card-qty-box { display: none; width: 100%; height: 100%; background: var(--bb-green); color: white; border-radius: 4px; justify-content: space-between; align-items: center; overflow: hidden; }
+        .qty-control-btn { background: transparent; border: none; color: white; width: 24px; height: 100%; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .qty-num { font-size: 13px; font-weight: bold; }
+
+        /* Sticky Bottom Checkout Footer Bar */
+        .bottom-basket-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border-color); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -4px 15px rgba(0,0,0,0.08); z-index: 999; }
+        .basket-info { display: flex; flex-direction: column; }
+        .basket-items-count { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .basket-total-amt { font-size: 20px; font-weight: 800; color: #111; margin-top: 2px; }
+        .checkout-action-btn { background: var(--bb-green); color: white; border: none; padding: 12px 32px; border-radius: 6px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(132, 194, 37, 0.3); transition: background 0.2s; }
+        .checkout-action-btn:hover { background: var(--bb-dark-green); }
+        
+        .loading-shimmer { grid-column: span 2; text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; font-weight: 500; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div class="top-row">
-            <div class="logo">bigbasket</div>
-            <div class="basket-badge" id="basket-count">Basket: 0</div>
+    <!-- Premium Navigation Shell -->
+    <div class="bb-nav">
+        <div class="top-bar">
+            <div class="brand-logo">bigbasket</div>
+            <div style="font-size: 18px; cursor: pointer;">🔍</div>
         </div>
-        <div class="search-container">
-            <input type="text" class="search-input" id="search-query" placeholder="Search (e.g., milk, tomato)..." value="milk">
-            <button class="search-btn" onclick="fetchLiveProducts()">Search</button>
+        <div class="sub-header">
+            <div class="location-selector" id="loc-text">Delivering to Ranchi, 834001</div>
+            <div class="profile-section">
+                <span class="profile-avatar" id="avatar-char">U</span>
+                <span id="username-display">User</span>
+            </div>
+        </div>
+        <div class="search-box-wrapper">
+            <div class="search-bar-inner">
+                <input type="text" class="search-input" id="search-field" placeholder="Search 18,000+ products..." value="milk">
+                <button class="search-submit-btn" onclick="triggerSearch()">Search</button>
+            </div>
+        </div>
+        <div class="categories-slider">
+            <div class="cat-chip active" onclick="quickFilter(this, 'milk')">Milk & Dairy</div>
+            <div class="cat-chip" onclick="quickFilter(this, 'bread')">Bread & Bakery</div>
+            <div class="cat-chip" onclick="quickFilter(this, 'tomato')">Vegetables</div>
+            <div class="cat-chip" onclick="quickFilter(this, 'fruits')">Fresh Fruits</div>
+            <div class="cat-chip" onclick="quickFilter(this, 'atta')">Atta & Dals</div>
         </div>
     </div>
 
-    <div class="container" id="product-grid">
-        <div class="status-msg">Click Search to load items...</div>
+    <!-- Dynamic Product Grid Layout -->
+    <div class="main-container" id="grid-root">
+        <!-- Render Layer -->
     </div>
 
-    <div class="footer-bar">
-        <div>
-            <span style="font-size: 12px; color: #777;">Total Price</span>
-            <div style="font-size: 18px; font-weight: bold;" id="total-price">₹0</div>
+    <!-- Floating Real Checkout Strip -->
+    <div class="bottom-basket-sheet">
+        <div class="basket-info">
+            <span class="basket-items-count" id="sheet-qty-lbl">0 ITEMS</span>
+            <div class="basket-total-amt" id="sheet-total-lbl">₹0</div>
         </div>
-        <button class="view-cart-btn" onclick="sendCartToBot()">View Basket</button>
+        <button class="checkout-action-btn" onclick="handleCheckout()">View Basket</button>
     </div>
 
     <script>
@@ -184,91 +121,113 @@
         tg.ready();
         tg.expand();
 
-        let cart = {};
+        let shoppingCart = {};
 
-        // Live Product Search System
-        async function fetchLiveProducts() {
-            const grid = document.getElementById('product-grid');
-            const query = document.getElementById('search-query').value.trim();
-            if(!query) return;
-            
-            grid.innerHTML = '<div class="status-msg">Searching BigBasket live inventory...</div>';
-            
+        // Parse Telegram User profile context info safely
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            const userObj = tg.initDataUnsafe.user;
+            const name = userObj.first_name || "User";
+            document.getElementById('username-display').innerText = name;
+            document.getElementById('avatar-char').innerText = name.charAt(0).toUpperCase();
+        }
+
+        function quickFilter(element, query) {
+            document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            document.getElementById('search-field').value = query;
+            triggerSearch();
+        }
+
+        async function triggerSearch() {
+            const root = document.getElementById('grid-root');
+            const searchVal = document.getElementById('search-field').value.trim();
+            if(!searchVal) return;
+
+            root.innerHTML = '<div class="loading-shimmer">🔄 Loading fresh inventory catalog...</div>';
+
             try {
-                // Yeh hamare bot.py ke backend search proxy handler ko hit karega
-                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
-                const data = await response.json();
+                const response = await fetch(`/api/search?query=${encodeURIComponent(searchVal)}`);
+                const resData = await response.json();
                 
-                grid.innerHTML = '';
-                if(!data.products || data.products.length === 0) {
-                    grid.innerHTML = '<div class="status-msg">No products found. Try another search.</div>';
+                root.innerHTML = '';
+                if(!resData.products || resData.products.length === 0) {
+                    root.innerHTML = '<div class="loading-shimmer">❌ No products found. Try another brand name.</div>';
                     return;
                 }
-                
-                data.products.forEach((product, idx) => {
-                    const pId = `p_${idx}`;
+
+                resData.products.forEach((prod, index) => {
+                    const uniqueId = `item_${index}`;
                     const card = document.createElement('div');
-                    card.className = 'product-card';
+                    card.className = 'item-card';
+                    
+                    // Client safety escaping for titles to bypass Javascript break codes
+                    const cleanTitle = prod.title.replace(/'/g, "\\'");
+                    
                     card.innerHTML = `
-                        <img class="product-img" src="${product.image || 'https://via.placeholder.com/100'}" alt="img">
-                        <div class="product-title">${product.title}</div>
-                        <div class="product-price">₹${product.price}</div>
-                        <button class="add-btn" id="btn_${pId}" onclick="addToCart('${pId}', '${product.title.replace(/'/g, "")}', ${product.price})">ADD</button>
-                        <div class="qty-layout" id="qty_${pId}">
-                            <button class="qty-btn" onclick="changeQty('${pId}', -1)">-</button>
-                            <span id="val_${pId}">1</span>
-                            <button class="qty-btn" onclick="changeQty('${pId}', 1)">+</button>
+                        <div class="brand-name">Fresho Custom</div>
+                        <div class="img-container">
+                            <img class="item-img" src="${prod.image}" alt="product image" onerror="this.src='https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg'">
+                        </div>
+                        <div class="item-title">${prod.title}</div>
+                        <div class="pricing-row">
+                            <div class="price-val">₹${prod.price}</div>
+                            <div class="action-box">
+                                <button class="card-add-btn" id="add_btn_${uniqueId}" onclick="addItem('${uniqueId}', '${cleanTitle}', ${prod.price})">Add</button>
+                                <div class="card-qty-box" id="qty_box_${uniqueId}">
+                                    <button class="qty-control-btn" onclick="adjustQty('${uniqueId}', -1)">-</button>
+                                    <span class="qty-num" id="qty_num_${uniqueId}">1</span>
+                                    <button class="qty-control-btn" onclick="adjustQty('${uniqueId}', 1)">+</button>
+                                </div>
+                            </div>
                         </div>
                     `;
-                    grid.appendChild(card);
+                    root.appendChild(card);
                 });
             } catch (err) {
-                grid.innerHTML = '<div class="status-msg">Failed to fetch data. Check API configuration.</div>';
+                root.innerHTML = '<div class="loading-shimmer">⚠️ Connection timed out. Pull down to refresh.</div>';
             }
         }
 
-        function addToCart(id, name, price) {
-            cart[id] = { name: name, price: price, qty: 1 };
-            document.getElementById(`btn_${id}`).style.display = 'none';
-            document.getElementById(`qty_${id}`).style.display = 'flex';
-            updateSummary();
+        function addItem(id, title, cost) {
+            shoppingCart[id] = { name: title, price: cost, qty: 1 };
+            document.getElementById(`add_btn_${id}`).style.display = 'none';
+            document.getElementById(`qty_box_${id}`).style.display = 'flex';
+            recalculateCart();
         }
 
-        function changeQty(id, delta) {
-            if (!cart[id]) return;
-            cart[id].qty += delta;
-            if (cart[id].qty <= 0) {
-                delete cart[id];
-                document.getElementById(`btn_${id}`).style.display = 'block';
-                document.getElementById(`qty_${id}`).style.display = 'none';
+        function adjustQty(id, change) {
+            if (!shoppingCart[id]) return;
+            shoppingCart[id].qty += change;
+            if (shoppingCart[id].qty <= 0) {
+                delete shoppingCart[id];
+                document.getElementById(`add_btn_${id}`).style.display = 'block';
+                document.getElementById(`qty_box_${id}`).style.display = 'none';
             } else {
-                document.getElementById(`val_${id}`).innerText = cart[id].qty;
+                document.getElementById(`qty_num_${id}`).innerText = shoppingCart[id].qty;
             }
-            updateSummary();
+            recalculateCart();
         }
 
-        function updateSummary() {
-            let totalItems = 0, totalPrice = 0;
-            for (let key in cart) {
-                totalItems += cart[key].qty;
-                totalPrice += (cart[key].price * cart[key].qty);
+        function recalculateCart() {
+            let units = 0, totalBill = 0;
+            for (let k in shoppingCart) {
+                units += shoppingCart[k].qty;
+                totalBill += (shoppingCart[k].price * shoppingCart[k].qty);
             }
-            document.getElementById('basket-count').innerText = `Basket: ${totalItems}`;
-            document.getElementById('total-price').innerText = `₹${totalPrice}`;
+            document.getElementById('sheet-qty-lbl').innerText = `${units} ${units === 1 ? 'ITEM' : 'ITEMS'}`;
+            document.getElementById('sheet-total-lbl').innerText = `₹${totalBill}`;
         }
 
-        function sendCartToBot() {
-            if (Object.keys(cart).length === 0) {
-                tg.showAlert("Aapka basket khali hai!");
+        function handleCheckout() {
+            if (Object.keys(shoppingCart).length === 0) {
+                tg.showAlert("Your cart is empty! Add products before checkout.");
                 return;
             }
-            tg.sendData(JSON.stringify(cart));
+            tg.sendData(JSON.stringify(shoppingCart));
             tg.close();
         }
 
-        // Initially load data when window opens
-        window.onload = fetchLiveProducts;
+        window.onload = triggerSearch;
     </script>
 </body>
-  </html>
-  
+</html>

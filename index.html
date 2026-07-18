@@ -114,7 +114,8 @@
         <div class="delivery-row">
             <div>
                 <div class="eta-badge">⚡ 5 mins</div>
-                <div class="location-dropdown" id="loc-lbl" onclick="triggerManualLoc()">Home - house no. 3, Shanti nagar...</div>
+                <!-- Real location placeholder -->
+                <div class="location-dropdown" id="loc-lbl" onclick="fetchLiveDeviceLocation()">Fetching real location...</div>
             </div>
             <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
         </div>
@@ -213,6 +214,7 @@
 
         let applicationCart = {};
         let localizedBillSum = 0;
+        let finalGeoString = "Unknown Location";
 
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const runtimeUser = tg.initDataUnsafe.user;
@@ -222,9 +224,52 @@
             document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
+        // --- REAL LOCATION FETCH MODULE (HTML5 GPS API) ---
+        function fetchLiveDeviceLocation() {
+            const locLbl = document.getElementById('loc-lbl');
+            locLbl.innerText = "Accessing GPS...";
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        
+                        locLbl.innerText = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+                        finalGeoString = `GPS [${lat.toFixed(6)}, ${lon.toFixed(6)}]`;
+
+                        // Free Reverse Geocoding via OpenStreetMap API to fetch real city name context dynamically
+                        try {
+                            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                            const geoData = await geoRes.json();
+                            if(geoData && geoData.address) {
+                                const city = geoData.address.city || geoData.address.town || geoData.address.suburb || "Ranchi";
+                                const postcode = geoData.address.postcode || "";
+                                const shortAddress = `${city} ${postcode}`.trim();
+                                locLbl.innerText = shortAddress.length > 30 ? shortAddress.substring(0, 28) + "..." : shortAddress;
+                                finalGeoString = geoData.display_name || finalGeoString;
+                            }
+                        } catch(err) {
+                            console.log("Reverse geocode pipeline failed, fallback to raw coordinates.");
+                        }
+                    },
+                    (error) => {
+                        locLbl.innerText = "Location access denied. Click to retry.";
+                        console.error(error);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            } else {
+                locLbl.innerText = "Geolocation not supported";
+            }
+        }
+
         function triggerManualLoc() {
-            const editLoc = prompt("Change delivery location context:", "Home - house no. 3, Shanti nagar");
-            if(editLoc) document.getElementById('loc-lbl').innerText = editLoc;
+            const editLoc = prompt("Manually override address:", "Ranchi, Jharkhand");
+            if(editLoc) {
+                document.getElementById('loc-lbl').innerText = editLoc;
+                finalGeoString = editLoc;
+            }
         }
 
         function switchNavTab(targetTab) {
@@ -259,32 +304,4 @@
 
             gridRoot.innerHTML = '<div class="shimmer-state">🔄 Syncing with BigBasket Data Nodes...</div>';
 
-            // Safe robust data fallback arrays map to bypass network blockings instantly
-            const fallbackCatalog = {
-                "biscuit": [
-                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
-                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg", "wgt": "400 g"},
-                    {"title": "Sunfeast Dark Fantasy Choco Fills", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/40003154_6-sunfeast-dark-fantasy-choco-fills.jpg", "wgt": "75 g"}
-                ],
-                "milk": [
-                    {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg", "wgt": "1 L"},
-                    {"title": "Nandini Pasteurized Toned Milk 500 ml", "price": 24, "image": "https://www.bigbasket.com/media/uploads/p/l/30006479_3-nandini-pasteurized-toned-milk.jpg", "wgt": "500 ml"}
-                ],
-                "chips": [
-                    {"title": "Lays Chips - India's Magic Masala", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/294713_4-lays-potato-chips-indias-magic-masala.jpg", "wgt": "50 g"},
-                    {"title": "Pringles Potato Crisps - Original", "price": 115, "image": "https://www.bigbasket.com/media/uploads/p/l/40021379_7-pringles-potato-crisps-original.jpg", "wgt": "107 g"}
-                ],
-                "electronics": [
-                    {"title": "boAt Wave Call Smartwatch Active", "price": 1299, "image": "https://www.bigbasket.com/media/uploads/p/l/40293881_1-boat-wave-call-smartwatch.jpg", "wgt": "1 Unit"}
-                ],
-                "organic": [
-                    {"title": "Fresho Organic Pure Cow Ghee", "price": 390, "image": "https://www.bigbasket.com/media/uploads/p/l/40135851_4-fresho-organic-pure-cow-ghee.jpg", "wgt": "500 ml"}
-                ]
-            };
-
-            let products = [];
-            
-            try {
-                // Background runtime fetch loop attempt
-                const response = await fetch(`/api/search?query=${encodeURIComponent(searchVal)}`);
-                const resData 
+            const fallbackCatalog 

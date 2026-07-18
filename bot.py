@@ -9,9 +9,10 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
+# Logging configurations for monitoring
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- GLOBAL SETTINGS (Tumhare updated private links aur labels) ---
+# --- GLOBAL CHANNELS & GC CONFIGURATIONS ---
 REQUIRED_TARGETS = [
     -1003332858806, -1003630519339, -1003197501531, -1003862251237
 ]
@@ -30,6 +31,7 @@ TARGET_LABELS = {
 
 bot_app = None
 
+# Membership validation module
 async def verify_user_membership(user_id: int) -> bool:
     global bot_app
     if not bot_app: return False
@@ -40,6 +42,7 @@ async def verify_user_membership(user_id: int) -> bool:
         except TelegramError: return False
     return True
 
+# Force Join menu alert constructor
 async def show_force_join_menu(update: Update):
     buttons = []
     for target in REQUIRED_TARGETS:
@@ -47,24 +50,28 @@ async def show_force_join_menu(update: Update):
     buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
     
     alert_text = "⚠️ **Access Denied!**\n\nBot features use karne ke liye channels aur GC join karein."
-    if update.message: await update.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
-    elif update.callback_query: await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    if update.message: 
+        await update.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    elif update.callback_query: 
+        await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
+# Main user dashboard keyboard matrix layout
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("🏠 Home")],
-        # Yeh button premium Mini App ko open karega
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))],
         [KeyboardButton("💰 Wallet"), KeyboardButton("➕ New Login")]
     ], resize_keyboard=True)
 
+# Main command start router logic
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verify_user_membership(update.effective_user.id):
         await show_force_join_menu(update)
         return
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
+# Inline verification callbacks processor 
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -74,23 +81,53 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
+# NEW UPGRADED RECEIPTS GENERATOR (Boring JSON Overrider)
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = update.effective_message.web_app_data.data
-    await update.message.reply_text(f"🛒 **Order Received from Mini App!**\n\n```json\n{data}\n```", parse_mode="Markdown")
+    raw_data = update.effective_message.web_app_data.data
+    
+    try:
+        cart_items = json.loads(raw_data)
+        
+        receipt_text = "🟢 **bigbasket - Order Invoice Summary**\n"
+        receipt_text += "────────────────────────\n"
+        
+        total_bill = 0
+        counter = 1
+        
+        for key, item in cart_items.items():
+            name = item.get("name", "Item")
+            price = item.get("price", 0)
+            qty = item.get("qty", 0)
+            subtotal = price * qty
+            total_bill += subtotal
+            
+            receipt_text += f"{counter}. 📦 **{name}**\n"
+            receipt_text += f"   Quantity: `{qty}` | Rate: ₹{price}\n"
+            receipt_text += f"   Subtotal: **₹{subtotal}**\n\n"
+            counter += 1
+            
+        receipt_text += "────────────────────────\n"
+        receipt_text += f"💰 **Total Bill Amount: ₹{total_bill}**\n\n"
+        receipt_text += "✅ *Order generated successfully from Mini App session. Ready for execution.*"
+        
+        await update.message.reply_text(receipt_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logging.error(f"Failed to generate structured order receipt: {e}")
+        await update.message.reply_text("⚠️ *Error loading order configuration metadata.*", parse_mode="Markdown")
 
-# --- FASTAPI WEBHOOK INTEGRATION ---
+# --- FASTAPI WEBHOOK AND REVERSE PROXY INTEGRATION ---
 api_app = FastAPI()
 
 @api_app.get("/")
 def home(): 
     return FileResponse("index.html")
 
-# --- STEP 2: DYNAMIC DATA PARSER WITH ACCURATE MATCHING ---
+# Dynamic live data matching router utilizing internal fallback engine
 @api_app.get("/api/search")
 def proxy_search(query: str = "milk", page: int = 1):
     api_key = os.getenv("PARSE_BOT_API_KEY")
     
-    # Static Fallback Data - Agar live API fail ho ya delay kare, toh cross mismatch na ho
     catalog_fallbacks = {
         "milk": [
             {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg"},
@@ -108,7 +145,6 @@ def proxy_search(query: str = "milk", page: int = 1):
         ]
     }
 
-    # Default catalog agar koi aur keyword search ho jaye
     default_catalog = catalog_fallbacks["milk"] + catalog_fallbacks["bread"] + catalog_fallbacks["tomato"]
 
     if not api_key:
@@ -125,7 +161,6 @@ def proxy_search(query: str = "milk", page: int = 1):
         with urllib.request.urlopen(req, timeout=12.0) as response:
             raw_data = json.loads(response.read().decode('utf-8'))
             
-            # Deep key checking algorithm taaki response khali na aaye
             extracted_items = []
             if isinstance(raw_data, list):
                 extracted_items = raw_data
@@ -145,7 +180,6 @@ def proxy_search(query: str = "milk", page: int = 1):
                 price = node.get("price") or node.get("sale_price") or node.get("mrp") or 45
                 image = node.get("image") or node.get("image_url") or node.get("thumbnail") or ""
                 
-                # Agar API image na de paaye toh generic potato display fallback lagaya
                 if not image or "placeholder" in image:
                     image = "https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg"
                 
@@ -187,4 +221,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-                                                
+    

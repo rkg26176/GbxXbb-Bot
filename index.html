@@ -116,7 +116,7 @@
         <div class="delivery-row">
             <div>
                 <div class="eta-badge">⚡ 5 mins</div>
-                <!-- Dropdown layout, clicks are wrapped safely -->
+                <!-- Is address line par tap karte hi manual city name dialog box trigger hoga -->
                 <div class="location-dropdown" id="loc-lbl" onclick="triggerManualLoc()">Mumbai, Maharashtra</div>
             </div>
             <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
@@ -209,7 +209,7 @@
         </div>
     </div>
 
-    <script>
+    <script {nonce}>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
@@ -226,7 +226,7 @@
             document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
-        // Try automatic device location grab without letting the thread freeze if blocked
+        // Safe background hardware query engine inside a secure block
         async function tryAutoLocationGrab() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -243,9 +243,9 @@
                                 document.getElementById('loc-lbl').innerText = shortAddress.length > 28 ? shortAddress.substring(0, 26) + "..." : shortAddress;
                                 finalGeoString = osmData.display_name || shortAddress;
                             }
-                        } catch(e) { console.log("OSM API Blocked."); }
+                        } catch(e) { console.log("OSM Lookup failure bypassed smoothly."); }
                     },
-                    (err) => { console.log("Sandbox Blocked Hardware Access."); },
+                    (err) => { console.log("Sandbox security block active."); },
                     { timeout: 3000 }
                 );
             }
@@ -294,4 +294,4 @@
             const fallbackCatalog = {
                 "biscuit": [
                     {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
-                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bre
+                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads

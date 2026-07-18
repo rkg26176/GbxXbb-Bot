@@ -1,34 +1,30 @@
 import os
 import logging
-import asyncio
-import uvicorn
+import json
+import urllib.request
+import urllib.parse
 from fastapi import FastAPI, Request, Response
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from fastapi.responses import FileResponse
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging configuration Render live tail ke liye
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- GLOBAL SETTINGS ---
+# --- GLOBAL SETTINGS (Tumhare updated private links ke sath) ---
 REQUIRED_TARGETS = [
-    -1003332858806,  # GBX LOOT ID
-    -1003630519339,  # GBX EARN ID
-    -1003197501531,  # GBX Zone ID
-    -1003862251237   # Group Chat (GC) ID
+    -1003332858806, -1003630519339, -1003197501531, -1003862251237
 ]
-
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
     -1003630519339: "https://t.me/+OWrCoeF-JutmNjg1",   
     -1003197501531: "https://t.me/+f2mWfDs6EUIxYTBl",   
     -1003862251237: "https://t.me/+O_-kEF2f5f1kMjdl"            
 }
-
 TARGET_LABELS = {
-    -1003332858806: "📢 Join GBX LOOT",
+    -1003332858806: "📢 Join GBX LOOT", 
     -1003630519339: "📢 Join GBX EARN",
-    -1003197501531: "📢 Join GBX Zone",
+    -1003197501531: "📢 Join GBX Zone", 
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
@@ -36,133 +32,121 @@ bot_app = None
 
 async def verify_user_membership(user_id: int) -> bool:
     global bot_app
-    if not bot_app:
-        return False
+    if not bot_app: return False
     for target in REQUIRED_TARGETS:
         try:
             member = await bot_app.bot.get_chat_member(chat_id=target, user_id=user_id)
-            if member.status in ['left', 'kicked']:
-                return False
-        except TelegramError as e:
-            logging.error(f"Error checking verification for target {target}: {e}")
-            return False
+            if member.status in ['left', 'kicked']: return False
+        except TelegramError: return False
     return True
 
 async def show_force_join_menu(update: Update):
     buttons = []
     for target in REQUIRED_TARGETS:
-        url = TARGET_LINKS.get(target, "https://t.me/")
-        label = TARGET_LABELS.get(target, "Join Community")
-        buttons.append([InlineKeyboardButton(text=label, url=url)])
-        
+        buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
     buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-    reply_markup = InlineKeyboardMarkup(buttons)
     
-    alert_text = (
-        "⚠️ **Access Denied!**\n\n"
-        "GbxXbb Bot ke features use karne ke liye aapko hamare **3 Channels** aur **Group Chat (GC)** ko join karna zaroori hai.\n\n"
-        "Links join karke niche diye gaye button se status verify karein."
-    )
-    
-    if update.message:
-        await update.message.reply_text(alert_text, reply_markup=reply_markup, parse_mode="Markdown")
-    elif update.callback_query:
-        await update.callback_query.message.reply_text(alert_text, reply_markup=reply_markup, parse_mode="Markdown")
+    alert_text = "⚠️ **Access Denied!**\n\nBot features use karne ke liye channels aur GC join karein."
+    if update.message: await update.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    elif update.callback_query: await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
 def load_dashboard_menu():
-    keyboard = [
+    MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
+    return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("🏠 Home")],
+        # Yeh button dynamic Mini App ko open karega
+        [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))],
         [KeyboardButton("💰 Wallet"), KeyboardButton("➕ New Login")]
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    ], resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    is_authorized = await verify_user_membership(user_id)
-    if not is_authorized:
+    if not await verify_user_membership(update.effective_user.id):
         await show_force_join_menu(update)
         return
-        
-    await update.message.reply_text(
-        "✨ **GbxXbb Dashboard Active!**\n\nVerification complete ho chuka hai. Niche diye gaye menu buttons se interface navigate karein:",
-        reply_markup=load_dashboard_menu(),
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
-    
-    is_valid = await verify_user_membership(user_id)
-    if is_valid:
+    if await verify_user_membership(query.from_user.id):
         await query.message.delete()
-        await query.message.reply_text(
-            "✅ Verification successful! Welcome to the main dashboard menu:",
-            reply_markup=load_dashboard_menu()
-        )
+        await query.message.reply_text("✅ Access Granted!", reply_markup=load_dashboard_menu())
     else:
-        await query.answer(text="❌ Aapne abhi tak saare channels ya GC join nahi kiya hai!", show_alert=True)
+        await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-async def process_menu_clicks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not await verify_user_membership(user_id):
-        await show_force_join_menu(update)
-        return
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = update.effective_message.web_app_data.data
+    await update.message.reply_text(f"🛒 **Order Received from Mini App!**\n\n```json\n{data}\n```", parse_mode="Markdown")
 
-    user_text = update.message.text
-    if user_text == "📱 My Accounts":
-        await update.message.reply_text("📂 Aapke authenticated account profiles ki list yahan display hogi...")
-    elif user_text == "💰 Wallet":
-        await update.message.reply_text("💵 Wallet Dashboard:\n\n• Current Active Balance: ₹0.00\n\nAdd money karne ke liye generic system ready ho raha hai.")
-    elif user_text == "➕ New Login":
-        await update.message.reply_text("🔑 Naya account register karne ke liye generic Phone Number (+91) format me input karein:")
-    elif user_text == "🏠 Home":
-        await update.message.reply_text("Aap main dashboard home page par hi hain.")
-
-# --- FASTAPI WEBHOOK LIFECYCLE ---
+# --- FASTAPI WEBHOOK INTEGRATION ---
 api_app = FastAPI()
+
+@api_app.get("/")
+def home(): 
+    return FileResponse("index.html")
+
+# Live Data API Route (PMX Key handling)
+@api_app.get("/api/search")
+def proxy_search(query: str = "milk", page: int = 1):
+    api_key = os.getenv("PARSE_BOT_API_KEY")
+    if not api_key:
+        return {"products": []}
+        
+    encoded_query = urllib.parse.quote(query)
+    url = f"https://api.parse.bot/scraper/1d9ca2c5-176c-4bc0-9cf3-db9056850958/search_products?page={page}&query={encoded_query}"
+    
+    req = urllib.request.Request(url)
+    req.add_header("X-API-Key", api_key)
+    
+    try:
+        with urllib.request.urlopen(req, timeout=15.0) as response:
+            raw_data = json.loads(response.read().decode('utf-8'))
+            
+            results = raw_data.get("results", []) or raw_data.get("products", [])
+            if isinstance(raw_data, list):
+                results = raw_data
+            elif not results and "data" in raw_data:
+                results = raw_data["data"]
+                
+            formatted_products = []
+            for item in results[:20]:
+                formatted_products.append({
+                    "title": item.get("title") or item.get("name", "BigBasket Item"),
+                    "price": item.get("price") or item.get("sale_price", 0),
+                    "image": item.get("image") or item.get("image_url", "")
+                })
+            return {"products": formatted_products}
+    except Exception as e:
+        logging.error(f"API Connection Error: {e}")
+        return {"products": []}
 
 @api_app.on_event("startup")
 async def init_webhook_mode():
     global bot_app
     TOKEN = os.getenv("BOT_TOKEN")
-    URL = os.getenv("RENDER_EXTERNAL_URL")  # Render ka base URL automatically milta hai
-    
-    if not TOKEN or not URL:
-        logging.critical("CRITICAL: Environment variables missing!")
-        return
+    URL = os.getenv("RENDER_EXTERNAL_URL")
+    if not TOKEN or not URL: return
 
-    # Modern initialization pattern WITHOUT internal updater looping
     bot_app = Application.builder().token(TOKEN).updater(None).build()
-    
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
-    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, process_menu_clicks))
-    
+    bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
+    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, start))
     
     await bot_app.initialize()
     await bot_app.start()
-    
-    # Telegram ko batana ki requests is endpoint par bheje
-    webhook_url = f"{URL}/webhook"
-    await bot_app.bot.set_webhook(url=webhook_url)
-    logging.info(f"✅ Webhook successfully configured on: {webhook_url}")
+    await bot_app.bot.set_webhook(url=f"{URL}/webhook")
 
 @api_app.post("/webhook")
 async def receive_telegram_update(request: Request):
     global bot_app
     if bot_app:
         data = await request.json()
-        update = Update.de_json(data, bot_app.bot)
-        await bot_app.process_update(update)
+        await bot_app.process_update(Update.de_json(data, bot_app.bot))
     return Response(status_code=200)
 
-@api_app.get("/")
-def health():
-    return {"status": "GbxXbb Webhook Gateway Live"}
-
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
     

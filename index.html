@@ -20,7 +20,7 @@
         .bb-sticky-header { position: sticky; top: 0; background: white; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
         .delivery-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 4px 16px; }
         .eta-badge { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 4px; color: var(--bb-dark); }
-        .location-dropdown { font-size: 13px; font-weight: 600; color: #555; display: flex; align-items: center; margin-top: 2px; cursor: pointer; }
+        .location-dropdown { font-size: 13px; font-weight: 600; color: #555; display: flex; align-items: center; margin-top: 2px; cursor: pointer; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .location-dropdown::after { content: " ▾"; color: #888; font-size: 14px; }
         
         .profile-btn { width: 34px; height: 34px; background: #f0f1f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #555; cursor: pointer; border: 1px solid #e2e3e4; }
@@ -105,6 +105,8 @@
         .nav-tab-node.active { color: var(--bb-green); }
         .nav-tab-icon { font-size: 18px; }
         .nav-tab-lbl { font-size: 10px; font-weight: 700; }
+        
+        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -114,8 +116,7 @@
         <div class="delivery-row">
             <div>
                 <div class="eta-badge">⚡ 5 mins</div>
-                <!-- Real location placeholder -->
-                <div class="location-dropdown" id="loc-lbl" onclick="fetchLiveDeviceLocation()">Fetching real location...</div>
+                <div class="location-dropdown" id="loc-lbl" onclick="triggerManualLoc()">Ranchi, Jharkhand</div>
             </div>
             <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
         </div>
@@ -214,7 +215,7 @@
 
         let applicationCart = {};
         let localizedBillSum = 0;
-        let finalGeoString = "Unknown Location";
+        let finalGeoString = "Ranchi, India";
 
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const runtimeUser = tg.initDataUnsafe.user;
@@ -224,48 +225,31 @@
             document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
-        // --- REAL LOCATION FETCH MODULE (HTML5 GPS API) ---
-        function fetchLiveDeviceLocation() {
-            const locLbl = document.getElementById('loc-lbl');
-            locLbl.innerText = "Accessing GPS...";
-
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        
-                        locLbl.innerText = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
-                        finalGeoString = `GPS [${lat.toFixed(6)}, ${lon.toFixed(6)}]`;
-
-                        // Free Reverse Geocoding via OpenStreetMap API to fetch real city name context dynamically
-                        try {
-                            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                            const geoData = await geoRes.json();
-                            if(geoData && geoData.address) {
-                                const city = geoData.address.city || geoData.address.town || geoData.address.suburb || "Ranchi";
-                                const postcode = geoData.address.postcode || "";
-                                const shortAddress = `${city} ${postcode}`.trim();
-                                locLbl.innerText = shortAddress.length > 30 ? shortAddress.substring(0, 28) + "..." : shortAddress;
-                                finalGeoString = geoData.display_name || finalGeoString;
-                            }
-                        } catch(err) {
-                            console.log("Reverse geocode pipeline failed, fallback to raw coordinates.");
+        // --- NATIVE TELEGRAM GEOLOCATION ACCESS PROTOCOL ---
+        function initTelegramLocation() {
+            try {
+                // Telegram native location service available validation check
+                if (tg.LocationManager) {
+                    tg.LocationManager.init(() => {
+                        if (tg.LocationManager.isLocationAvailable) {
+                            tg.LocationManager.getLocation((data) => {
+                                if (data && data.latitude) {
+                                    const lat = data.latitude;
+                                    const lon = data.longitude;
+                                    finalGeoString = `GPS [${lat.toFixed(5)}, ${lon.toFixed(5)}]`;
+                                    document.getElementById('loc-lbl').innerText = `📍 Live GPS Fixed`;
+                                }
+                            });
                         }
-                    },
-                    (error) => {
-                        locLbl.innerText = "Location access denied. Click to retry.";
-                        console.error(error);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-            } else {
-                locLbl.innerText = "Geolocation not supported";
+                    });
+                }
+            } catch (err) {
+                console.log("Telegram LocationManager initialization safety bypass active.");
             }
         }
 
         function triggerManualLoc() {
-            const editLoc = prompt("Manually override address:", "Ranchi, Jharkhand");
+            const editLoc = prompt("Manually override address text:", "Ranchi, Jharkhand");
             if(editLoc) {
                 document.getElementById('loc-lbl').innerText = editLoc;
                 finalGeoString = editLoc;
@@ -304,4 +288,12 @@
 
             gridRoot.innerHTML = '<div class="shimmer-state">🔄 Syncing with BigBasket Data Nodes...</div>';
 
-            const fallbackCatalog 
+            const fallbackCatalog = {
+                "biscuit": [
+                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
+                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg", "wgt": "400 g"},
+                    {"title": "Sunfeast Dark Fantasy Choco Fills", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/40003154_6-sunfeast-dark-fantasy-choco-fills.jpg", "wgt": "75 g"}
+                ],
+                "milk": [
+                    {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg", "wgt": "1 L"},
+                    {"title": "Nandini Pasteurized Toned Milk 500 ml", "price": 24, "image":

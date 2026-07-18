@@ -2,15 +2,15 @@ import os
 import logging
 import asyncio
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging setup Render console verification ke liye
+# Logging setup Render ke logs read karne ke liye
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- GLOBAL CORE CONFIGURATIONS ---
+# --- GLOBAL CONFIGURATIONS ---
 REQUIRED_TARGETS = [
     -1003332858806,  # GBX LOOT ID
     -1003630519339,  # GBX EARN ID
@@ -120,17 +120,19 @@ async def process_menu_clicks(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif user_text == "🏠 Home":
         await update.message.reply_text("Aap main dashboard home page par hi hain.")
 
-# --- FASTAPI WEBHOOK INTEGRATION SETUP ---
+# --- FASTAPI SERVER SETUP ---
 api_app = FastAPI()
 
-@api_app.on_event("startup")
-async def initialize_webhook_routing():
+@api_app.get("/")
+def home():
+    return {"status": "GbxXbb Verification Node Online"}
+
+# Sahi standalone worker initiation pattern jo loop crash nahi karega
+async def run_bot_polling():
     global bot_app
     TOKEN = os.getenv("BOT_TOKEN")
-    RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
-    
-    if not TOKEN or not RENDER_URL:
-        logging.critical("CRITICAL: Environment mapping values for BOT_TOKEN or RENDER_EXTERNAL_URL are missing!")
+    if not TOKEN:
+        logging.critical("CRITICAL: BOT_TOKEN is missing!")
         return
         
     bot_app = Application.builder().token(TOKEN).build()
@@ -139,25 +141,24 @@ async def initialize_webhook_routing():
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_menu_clicks))
     
+    # Is tarah se execution framework loops aapas me clash nahi karte
     await bot_app.initialize()
     await bot_app.start()
     
-    webhook_target_path = f"{RENDER_URL}/telegram-webhook"
-    await bot_app.bot.set_webhook(url=webhook_target_path)
-    logging.info(f"Webhook securely bound to target location endpoint: {webhook_target_path}")
+    logging.info("GbxXbb Bot has successfully started polling loop...")
+    
+    # Polling execute karne ke liye cleaner abstraction method use kiya
+    updater = bot_app.updater
+    await updater.start_polling(drop_pending_updates=True)
+    
+    # Keep running loop alive safely without breaking Uvicorn
+    while True:
+        await asyncio.sleep(3600)
 
-@api_app.post("/telegram-webhook")
-async def process_telegram_incoming_payload(request: Request):
-    global bot_app
-    if bot_app:
-        payload_data = await request.json()
-        update_object = Update.de_json(payload_data, bot_app.bot)
-        await bot_app.process_update(update_object)
-    return Response(status_code=200)
-
-@api_app.get("/")
-def home():
-    return {"status": "GbxXbb Webhook Engine Operational"}
+@api_app.on_event("startup")
+async def startup_event():
+    # Polling function ko task ke tarike se background loop me push karna bina startup ko block kiye
+    asyncio.create_task(run_bot_polling())
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

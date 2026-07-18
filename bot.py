@@ -1,15 +1,14 @@
 import os
 import logging
-import json
 import urllib.request
 import urllib.parse
+import json
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging configurations for monitoring
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 # --- GLOBAL CHANNELS & GC CONFIGURATIONS ---
@@ -31,7 +30,6 @@ TARGET_LABELS = {
 
 bot_app = None
 
-# Membership validation module
 async def verify_user_membership(user_id: int) -> bool:
     global bot_app
     if not bot_app: return False
@@ -42,7 +40,6 @@ async def verify_user_membership(user_id: int) -> bool:
         except TelegramError: return False
     return True
 
-# Force Join menu alert constructor
 async def show_force_join_menu(update: Update):
     buttons = []
     for target in REQUIRED_TARGETS:
@@ -55,7 +52,6 @@ async def show_force_join_menu(update: Update):
     elif update.callback_query: 
         await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
-# Main user dashboard keyboard matrix layout
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
@@ -64,14 +60,12 @@ def load_dashboard_menu():
         [KeyboardButton("💰 Wallet"), KeyboardButton("➕ New Login")]
     ], resize_keyboard=True)
 
-# Main command start router logic
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verify_user_membership(update.effective_user.id):
         await show_force_join_menu(update)
         return
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
-# Inline verification callbacks processor 
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -81,49 +75,36 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# NEW UPGRADED RECEIPTS GENERATOR (Boring JSON Overrider)
+# CLEAN DATA INTERCEPTOR (Sirf Order ID aur Payment Bill fetch karega)
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw_data = update.effective_message.web_app_data.data
+    raw_text = update.effective_message.web_app_data.data
     
     try:
-        cart_items = json.loads(raw_data)
+        # Mini app se data is format me aayega -> ORDER_ID:BB123456|TOTAL_BILL:₹500
+        parts = raw_text.split("|")
+        order_id = parts[0].split(":")[1]
+        total_bill = parts[1].split(":")[1]
         
-        receipt_text = "🟢 **bigbasket - Order Invoice Summary**\n"
-        receipt_text += "────────────────────────\n"
+        receipt = "🎉 **Order Placed Successfully!**\n"
+        receipt += "────────────────────────\n"
+        receipt += f"🆔 **Order ID:** `{order_id}`\n"
+        receipt += f"💵 **Total Bill Amount:** **{total_bill}**\n"
+        receipt += "────────────────────────\n"
+        receipt += "🚚 *Your package is being prepared for dispatch.*"
         
-        total_bill = 0
-        counter = 1
-        
-        for key, item in cart_items.items():
-            name = item.get("name", "Item")
-            price = item.get("price", 0)
-            qty = item.get("qty", 0)
-            subtotal = price * qty
-            total_bill += subtotal
-            
-            receipt_text += f"{counter}. 📦 **{name}**\n"
-            receipt_text += f"   Quantity: `{qty}` | Rate: ₹{price}\n"
-            receipt_text += f"   Subtotal: **₹{subtotal}**\n\n"
-            counter += 1
-            
-        receipt_text += "────────────────────────\n"
-        receipt_text += f"💰 **Total Bill Amount: ₹{total_bill}**\n\n"
-        receipt_text += "✅ *Order generated successfully from Mini App session. Ready for execution.*"
-        
-        await update.message.reply_text(receipt_text, parse_mode="Markdown")
+        await update.message.reply_text(receipt, parse_mode="Markdown")
         
     except Exception as e:
-        logging.error(f"Failed to generate structured order receipt: {e}")
-        await update.message.reply_text("⚠️ *Error loading order configuration metadata.*", parse_mode="Markdown")
+        logging.error(f"Text processing error: {e}")
+        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Data:* {raw_text}")
 
-# --- FASTAPI WEBHOOK AND REVERSE PROXY INTEGRATION ---
+# --- FASTAPI WEBHOOK AND PROXY INTEGRATION ---
 api_app = FastAPI()
 
 @api_app.get("/")
 def home(): 
     return FileResponse("index.html")
 
-# Dynamic live data matching router utilizing internal fallback engine
 @api_app.get("/api/search")
 def proxy_search(query: str = "milk", page: int = 1):
     api_key = os.getenv("PARSE_BOT_API_KEY")
@@ -158,7 +139,7 @@ def proxy_search(query: str = "milk", page: int = 1):
     req.add_header("X-API-Key", api_key)
     
     try:
-        with urllib.request.urlopen(req, timeout=12.0) as response:
+        with urllib.request.urlopen(req, timeout=15.0) as response:
             raw_data = json.loads(response.read().decode('utf-8'))
             
             extracted_items = []
@@ -166,7 +147,7 @@ def proxy_search(query: str = "milk", page: int = 1):
                 extracted_items = raw_data
             elif isinstance(raw_data, dict):
                 for key in ["results", "products", "data", "items"]:
-                    if isinstance(raw_data.get(key), list) and len(raw_data.get(key)) > 0:
+                    if isinstance(raw_data.get(key), list):
                         extracted_items = raw_data[key]
                         break
             
@@ -176,9 +157,9 @@ def proxy_search(query: str = "milk", page: int = 1):
 
             formatted_out = []
             for node in extracted_items[:20]:
-                title = node.get("title") or node.get("name") or "BigBasket Fresh Product"
-                price = node.get("price") or node.get("sale_price") or node.get("mrp") or 45
-                image = node.get("image") or node.get("image_url") or node.get("thumbnail") or ""
+                title = node.get("title") or node.get("name") or "No Title"
+                price = node.get("price") or node.get("sale_price") or 45
+                image = node.get("image") or node.get("image_url") or ""
                 
                 if not image or "placeholder" in image:
                     image = "https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg"
@@ -188,7 +169,7 @@ def proxy_search(query: str = "milk", page: int = 1):
             return {"products": formatted_out}
             
     except Exception as e:
-        logging.error(f"Fallback activation due to API Exception: {e}")
+        logging.error(f"API Error: {e}")
         matched = catalog_fallbacks.get(query.lower().strip())
         return {"products": matched if matched else default_catalog}
 

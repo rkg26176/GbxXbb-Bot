@@ -21,7 +21,6 @@
         .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
         .brand-logo { font-size: 22px; font-weight: 900; color: var(--bb-green); letter-spacing: -0.5px; }
         
-        /* Modern Dynamic Sub-Header with Action Triggers */
         .sub-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: #fdfdfd; font-size: 13px; border-bottom: 1px solid var(--border-color); gap: 10px; }
         .location-box { display: flex; flex-direction: column; flex: 1; }
         .location-current { font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -76,7 +75,6 @@
             <div style="font-size: 18px;">🛒</div>
         </div>
         
-        <!-- Updated Dynamic Address Bar & Simulated Profile Layer -->
         <div class="sub-header">
             <div class="location-box">
                 <div class="location-current" id="address-display">📍 Ranchi, Jharkhand, 834001</div>
@@ -120,8 +118,8 @@
         tg.expand();
 
         let shoppingCart = {};
+        let currentTotal = 0;
 
-        // Auto-read user data context from Telegram initialization window
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const tgUser = tg.initDataUnsafe.user;
             const displayName = tgUser.first_name || "User";
@@ -217,13 +215,14 @@
         }
 
         function recalculateCart() {
-            let units = 0, totalBill = 0;
+            let units = 0;
+            currentTotal = 0;
             for (let k in shoppingCart) {
                 units += shoppingCart[k].qty;
-                totalBill += (shoppingCart[k].price * shoppingCart[k].qty);
+                currentTotal += (shoppingCart[k].price * shoppingCart[k].qty);
             }
             document.getElementById('sheet-qty-lbl').innerText = `${units} ${units === 1 ? 'ITEM' : 'ITEMS'}`;
-            document.getElementById('sheet-total-lbl').innerText = `₹${totalBill}`;
+            document.getElementById('sheet-total-lbl').innerText = `₹${currentTotal}`;
         }
 
         function handleCheckout() {
@@ -231,7 +230,14 @@
                 tg.showAlert("Your cart is empty!");
                 return;
             }
-            tg.sendData(JSON.stringify(shoppingCart));
+            
+            // App ke andar hi Unique Random Order ID banana
+            const orderId = "BB" + Math.floor(100000 + Math.random() * 900000);
+            
+            // Bot ko bhejne ke liye sirf 2 parameters ka structured single text
+            const outputString = `ORDER_ID:${orderId}|TOTAL_BILL:₹${currentTotal}`;
+            
+            tg.sendData(outputString);
             tg.close();
         }
 

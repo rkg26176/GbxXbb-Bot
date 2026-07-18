@@ -11,7 +11,7 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- GLOBAL SETTINGS (Tumhare updated private links ke sath) ---
+# --- GLOBAL SETTINGS (Tumhare updated private links aur labels) ---
 REQUIRED_TARGETS = [
     -1003332858806, -1003630519339, -1003197501531, -1003862251237
 ]
@@ -54,7 +54,7 @@ def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("🏠 Home")],
-        # Yeh button dynamic Mini App ko open karega
+        # Yeh button premium Mini App ko open karega
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))],
         [KeyboardButton("💰 Wallet"), KeyboardButton("➕ New Login")]
     ], resize_keyboard=True)
@@ -85,27 +85,37 @@ api_app = FastAPI()
 def home(): 
     return FileResponse("index.html")
 
-# Live Data API Route (PMX Key handling)
-# Live Data API Route with Smart Fallback
+# --- STEP 2: DYNAMIC DATA PARSER WITH ACCURATE MATCHING ---
 @api_app.get("/api/search")
 def proxy_search(query: str = "milk", page: int = 1):
     api_key = os.getenv("PARSE_BOT_API_KEY")
     
-    # Pre-defined Asli BigBasket Catalog Products for Fail-Safe & Professional Look
-    fallback_catalog = [
-        {"title": "Amul Taaza Fresh Toned Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg"},
-        {"title": "Fresho Tomato - Local 1 kg", "price": 45, "image": "https://www.bigbasket.com/media/uploads/p/l/10000203_16-fresho-tomato-local.jpg"},
-        {"title": "Fresho Potato (Aloo) 1 kg", "price": 32, "image": "https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg"},
-        {"title": "Bonn Premium White Bread 400 g", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg"},
-        {"title": "Amul Malai Paneer Block 200 g", "price": 92, "image": "https://www.bigbasket.com/media/uploads/p/l/279589_9-amul-malai-paneer-block.jpg"},
-        {"title": "English Oven Premium Sandwich Bread", "price": 50, "image": "https://www.bigbasket.com/media/uploads/p/l/40075537_5-english-oven-bread-premium-sandwich.jpg"}
-    ]
+    # Static Fallback Data - Agar live API fail ho ya delay kare, toh cross mismatch na ho
+    catalog_fallbacks = {
+        "milk": [
+            {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg"},
+            {"title": "Nandini Pasteurized Toned Milk 500 ml", "price": 24, "image": "https://www.bigbasket.com/media/uploads/p/l/30006479_3-nandini-pasteurized-toned-milk.jpg"}
+        ],
+        "bread": [
+            {"title": "English Oven Premium Sandwich Bread 400g", "price": 45, "image": "https://www.bigbasket.com/media/uploads/p/l/40075537_5-english-oven-bread-premium-sandwich.jpg"},
+            {"title": "Bonn Premium White Bread Large 400g", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg"}
+        ],
+        "tomato": [
+            {"title": "Fresho Tomato - Local Fresh 1 kg", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/10000203_16-fresho-tomato-local.jpg"}
+        ],
+        "potato": [
+            {"title": "Fresho Potato (Aloo) Cold Storage 1 kg", "price": 32, "image": "https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg"}
+        ]
+    }
+
+    # Default catalog agar koi aur keyword search ho jaye
+    default_catalog = catalog_fallbacks["milk"] + catalog_fallbacks["bread"] + catalog_fallbacks["tomato"]
 
     if not api_key:
-        # Agar key missing hai toh sidhe sahi data dikhao
-        return {"products": fallback_catalog}
-        
-    encoded_query = urllib.parse.quote(query.lower())
+        matched = catalog_fallbacks.get(query.lower().strip())
+        return {"products": matched if matched else default_catalog}
+
+    encoded_query = urllib.parse.quote(query.lower().strip())
     url = f"https://api.parse.bot/scraper/1d9ca2c5-176c-4bc0-9cf3-db9056850958/search_products?page={page}&query={encoded_query}"
     
     req = urllib.request.Request(url)
@@ -115,64 +125,38 @@ def proxy_search(query: str = "milk", page: int = 1):
         with urllib.request.urlopen(req, timeout=12.0) as response:
             raw_data = json.loads(response.read().decode('utf-8'))
             
-            # Extracting products dynamically from API response
-            results = []
+            # Deep key checking algorithm taaki response khali na aaye
+            extracted_items = []
             if isinstance(raw_data, list):
-                results = raw_data
+                extracted_items = raw_data
             elif isinstance(raw_data, dict):
-                results = raw_data.get("results", []) or raw_data.get("products", []) or raw_data.get("data", [])
+                for key in ["results", "products", "data", "items"]:
+                    if isinstance(raw_data.get(key), list) and len(raw_data.get(key)) > 0:
+                        extracted_items = raw_data[key]
+                        break
             
-            if not results:
-                # Filter fallback catalog based on search query keywords (e.g. 'toast', 'milk')
-                filtered = [p for p in fallback_catalog if query.lower() in p["title"].lower() or (query.lower() == "tost" and "bread" in p["title"].lower())]
-                return {"products": filtered if filtered else fallback_catalog}
+            if not extracted_items:
+                matched = catalog_fallbacks.get(query.lower().strip())
+                return {"products": matched if matched else default_catalog}
+
+            formatted_out = []
+            for node in extracted_items[:20]:
+                title = node.get("title") or node.get("name") or "BigBasket Fresh Product"
+                price = node.get("price") or node.get("sale_price") or node.get("mrp") or 45
+                image = node.get("image") or node.get("image_url") or node.get("thumbnail") or ""
                 
-            formatted_products = []
-            for item in results[:20]:
-                formatted_products.append({
-                    "title": item.get("title") or item.get("name") or "BigBasket Item",
-                    "price": item.get("price") or item.get("sale_price") or 40,
-                    "image": item.get("image") or item.get("image_url") or "https://via.placeholder.com/100"
-                })
-            return {"products": formatted_products}
+                # Agar API image na de paaye toh generic potato display fallback lagaya
+                if not image or "placeholder" in image:
+                    image = "https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg"
+                
+                formatted_out.append({"title": title, "price": int(price), "image": image})
+                
+            return {"products": formatted_out}
             
     except Exception as e:
-        logging.error(f"API Connection Error: {e}")
-        # Server downtime ya error par catalog empty nahi dikhega
-        return {"products": fallback_catalog}
-        
-def proxy_search(query: str = "milk", page: int = 1):
-    api_key = os.getenv("PARSE_BOT_API_KEY")
-    if not api_key:
-        return {"products": []}
-        
-    encoded_query = urllib.parse.quote(query)
-    url = f"https://api.parse.bot/scraper/1d9ca2c5-176c-4bc0-9cf3-db9056850958/search_products?page={page}&query={encoded_query}"
-    
-    req = urllib.request.Request(url)
-    req.add_header("X-API-Key", api_key)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=15.0) as response:
-            raw_data = json.loads(response.read().decode('utf-8'))
-            
-            results = raw_data.get("results", []) or raw_data.get("products", [])
-            if isinstance(raw_data, list):
-                results = raw_data
-            elif not results and "data" in raw_data:
-                results = raw_data["data"]
-                
-            formatted_products = []
-            for item in results[:20]:
-                formatted_products.append({
-                    "title": item.get("title") or item.get("name", "BigBasket Item"),
-                    "price": item.get("price") or item.get("sale_price", 0),
-                    "image": item.get("image") or item.get("image_url", "")
-                })
-            return {"products": formatted_products}
-    except Exception as e:
-        logging.error(f"API Connection Error: {e}")
-        return {"products": []}
+        logging.error(f"Fallback activation due to API Exception: {e}")
+        matched = catalog_fallbacks.get(query.lower().strip())
+        return {"products": matched if matched else default_catalog}
 
 @api_app.on_event("startup")
 async def init_webhook_mode():
@@ -203,4 +187,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+                                                

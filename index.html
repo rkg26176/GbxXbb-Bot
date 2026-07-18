@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigBasket Live Store</title>
+    <!-- Telegram Mini App Core Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bb-green: #84c225;
+            --bb-dark: #333333;
+            --bg-light: #f6f6f6;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-light);
+            color: var(--bb-dark);
+        }
+        .header {
+            background: white;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--bb-green);
+        }
+        .basket-badge {
+            background: var(--bb-green);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .search-container {
+            display: flex;
+            gap: 8px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-btn {
+            background: var(--bb-green);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .container {
+            padding: 15px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 80px;
+        }
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .product-img {
+            width: 100%;
+            height: 100px;
+            object-fit: contain;
+        }
+        .product-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin: 5px 0;
+            height: 36px;
+            overflow: hidden;
+        }
+        .product-price {
+            font-size: 15px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .add-btn {
+            background: #fff;
+            color: #ff3f6c;
+            border: 1px solid #efefef;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+        }
+        .qty-layout {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bb-green);
+            color: white;
+            border-radius: 4px;
+        }
+        .qty-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .footer-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -3px 10px rgba(0,0,0,0.05);
+        }
+        .view-cart-btn {
+            background: var(--bb-green);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .status-msg {
+            text-align: center;
+            grid-column: span 2;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="top-row">
+            <div class="logo">bigbasket</div>
+            <div class="basket-badge" id="basket-count">Basket: 0</div>
+        </div>
+        <div class="search-container">
+            <input type="text" class="search-input" id="search-query" placeholder="Search (e.g., milk, tomato)..." value="milk">
+            <button class="search-btn" onclick="fetchLiveProducts()">Search</button>
+        </div>
+    </div>
+
+    <div class="container" id="product-grid">
+        <div class="status-msg">Click Search to load items...</div>
+    </div>
+
+    <div class="footer-bar">
+        <div>
+            <span style="font-size: 12px; color: #777;">Total Price</span>
+            <div style="font-size: 18px; font-weight: bold;" id="total-price">₹0</div>
+        </div>
+        <button class="view-cart-btn" onclick="sendCartToBot()">View Basket</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let cart = {};
+
+        // Live Product Search System
+        async function fetchLiveProducts() {
+            const grid = document.getElementById('product-grid');
+            const query = document.getElementById('search-query').value.trim();
+            if(!query) return;
+            
+            grid.innerHTML = '<div class="status-msg">Searching BigBasket live inventory...</div>';
+            
+            try {
+                // Yeh hamare bot.py ke backend search proxy handler ko hit karega
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                grid.innerHTML = '';
+                if(!data.products || data.products.length === 0) {
+                    grid.innerHTML = '<div class="status-msg">No products found. Try another search.</div>';
+                    return;
+                }
+                
+                data.products.forEach((product, idx) => {
+                    const pId = `p_${idx}`;
+                    const card = document.createElement('div');
+                    card.className = 'product-card';
+                    card.innerHTML = `
+                        <img class="product-img" src="${product.image || 'https://via.placeholder.com/100'}" alt="img">
+                        <div class="product-title">${product.title}</div>
+                        <div class="product-price">₹${product.price}</div>
+                        <button class="add-btn" id="btn_${pId}" onclick="addToCart('${pId}', '${product.title.replace(/'/g, "")}', ${product.price})">ADD</button>
+                        <div class="qty-layout" id="qty_${pId}">
+                            <button class="qty-btn" onclick="changeQty('${pId}', -1)">-</button>
+                            <span id="val_${pId}">1</span>
+                            <button class="qty-btn" onclick="changeQty('${pId}', 1)">+</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                grid.innerHTML = '<div class="status-msg">Failed to fetch data. Check API configuration.</div>';
+            }
+        }
+
+        function addToCart(id, name, price) {
+            cart[id] = { name: name, price: price, qty: 1 };
+            document.getElementById(`btn_${id}`).style.display = 'none';
+            document.getElementById(`qty_${id}`).style.display = 'flex';
+            updateSummary();
+        }
+
+        function changeQty(id, delta) {
+            if (!cart[id]) return;
+            cart[id].qty += delta;
+            if (cart[id].qty <= 0) {
+                delete cart[id];
+                document.getElementById(`btn_${id}`).style.display = 'block';
+                document.getElementById(`qty_${id}`).style.display = 'none';
+            } else {
+                document.getElementById(`val_${id}`).innerText = cart[id].qty;
+            }
+            updateSummary();
+        }
+
+        function updateSummary() {
+            let totalItems = 0, totalPrice = 0;
+            for (let key in cart) {
+                totalItems += cart[key].qty;
+                totalPrice += (cart[key].price * cart[key].qty);
+            }
+            document.getElementById('basket-count').innerText = `Basket: ${totalItems}`;
+            document.getElementById('total-price').innerText = `₹${totalPrice}`;
+        }
+
+        function sendCartToBot() {
+            if (Object.keys(cart).length === 0) {
+                tg.showAlert("Aapka basket khali hai!");
+                return;
+            }
+            tg.sendData(JSON.stringify(cart));
+            tg.close();
+        }
+
+        // Initially load data when window opens
+        window.onload = fetchLiveProducts;
+    </script>
+</body>
+  </html>
+  

@@ -7,10 +7,10 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging setup Render ke logs read karne ke liye
+# Logging configuration for Render dashboard view
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- GLOBAL CONFIGURATIONS ---
+# --- GLOBAL SETTINGS ---
 REQUIRED_TARGETS = [
     -1003332858806,  # GBX LOOT ID
     -1003630519339,  # GBX EARN ID
@@ -120,47 +120,43 @@ async def process_menu_clicks(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif user_text == "🏠 Home":
         await update.message.reply_text("Aap main dashboard home page par hi hain.")
 
-# --- FASTAPI SERVER SETUP ---
+# --- FASTAPI APP SYSTEM ---
 api_app = FastAPI()
 
 @api_app.get("/")
 def home():
-    return {"status": "GbxXbb Verification Node Online"}
+    return {"status": "GbxXbb API Service Online"}
 
-# Sahi standalone worker initiation pattern jo loop crash nahi karega
-async def run_bot_polling():
+# Clean asynchronous wrapper launcher block
+async def main_async_pipeline():
     global bot_app
     TOKEN = os.getenv("BOT_TOKEN")
     if not TOKEN:
-        logging.critical("CRITICAL: BOT_TOKEN is missing!")
+        logging.critical("BOT_TOKEN environment key is missing!")
         return
-        
+
+    # Native integration configuration sequence v20+
     bot_app = Application.builder().token(TOKEN).build()
-    
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_menu_clicks))
-    
-    # Is tarah se execution framework loops aapas me clash nahi karte
+
+    # Clean non-blocking custom initialization loop logic
     await bot_app.initialize()
     await bot_app.start()
     
-    logging.info("GbxXbb Bot has successfully started polling loop...")
+    # Starting standard server listener framework
+    port = int(os.getenv("PORT", 8000))
+    config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="warning")
+    server = uvicorn.Server(config)
     
-    # Polling execute karne ke liye cleaner abstraction method use kiya
-    updater = bot_app.updater
-    await updater.start_polling(drop_pending_updates=True)
-    
-    # Keep running loop alive safely without breaking Uvicorn
-    while True:
-        await asyncio.sleep(3600)
-
-@api_app.on_event("startup")
-async def startup_event():
-    # Polling function ko task ke tarike se background loop me push karna bina startup ko block kiye
-    asyncio.create_task(run_bot_polling())
+    # Run loop updates alongside target bot server frameworks seamlessly
+    await asyncio.gather(
+        server.serve(),
+        bot_app.updater.start_polling(drop_pending_updates=True)
+    )
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(api_app, host="0.0.0.0", port=port)
+    # Standard native loop runner trigger execution
+    asyncio.run(main_async_pipeline())
     

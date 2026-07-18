@@ -13,10 +13,10 @@
             --bb-pill-bg: #eaf5d6;
             --bb-pill-text: #4e820d;
         }
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
         body { margin: 0; padding: 0; background-color: var(--bb-light-bg); color: #333; overflow-x: hidden; padding-bottom: 120px; }
         
-        /* Fixed Real Top Shell */
+        /* Premium Header Shell */
         .bb-sticky-header { position: sticky; top: 0; background: white; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
         .delivery-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 4px 16px; }
         .eta-badge { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 4px; color: var(--bb-dark); }
@@ -25,14 +25,14 @@
         
         .profile-btn { width: 34px; height: 34px; background: #f0f1f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #555; cursor: pointer; border: 1px solid #e2e3e4; }
 
-        /* Search Shell Component */
-        .search-container { padding: 8px 16px 12px 16px; display: flex; gap: 10px; align-items: center; }
+        /* Search Layout Container */
+        .search-container { padding: 8px 16px 12px 16px; display: flex; gap: 10px; align-items: center; background: white; }
         .search-bar-inner { flex: 1; background: #f0f2f4; border-radius: 10px; border: 1px solid #e6e8ea; display: flex; align-items: center; padding: 0 12px; }
         .search-icon { color: #888; font-size: 16px; margin-right: 8px; }
         .search-input { width: 100%; border: none; background: transparent; padding: 10px 0; font-size: 14px; outline: none; color: #222; }
         .search-action-btn { background: var(--bb-green); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
 
-        /* Top horizontal chips row */
+        /* Horizontal Interactive Tabs */
         .horizontal-tabs { display: flex; gap: 12px; overflow-x: auto; padding: 8px 16px 12px 16px; scrollbar-width: none; background: white; border-bottom: 1px solid #eef0f2; }
         .horizontal-tabs::-webkit-scrollbar { display: none; }
         .tab-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; min-width: 55px; opacity: 0.6; transition: all 0.2s; }
@@ -41,15 +41,14 @@
         .tab-item.active .tab-icon-frame { background: white; border-color: #ddd; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .tab-label { font-size: 11px; font-weight: 700; text-align: center; color: #222; }
 
-        /* Banner Slider Component */
+        /* Fluid Banner Components */
         .promo-banner-space { padding: 12px 16px; background: white; display: block; }
         .bb-fluid-banner { width: 100%; border-radius: 12px; display: block; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
 
-        /* Main Catalog Title */
         .section-header-title { padding: 16px 16px 6px 16px; font-size: 16px; font-weight: 800; color: #000; display: flex; justify-content: space-between; align-items: center; }
         .see-all-link { font-size: 13px; color: var(--bb-green); font-weight: 700; cursor: pointer; }
 
-        /* 2-Column Product Cards Grid Layout */
+        /* Responsive 2-Column Catalog Grids */
         .product-grid-container { padding: 0 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .bb-product-card { background: white; border-radius: 12px; padding: 12px; border: 1px solid #eef0f2; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
         .discount-tag { position: absolute; top: 8px; left: 8px; background: #fdf0f0; color: #d93838; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
@@ -66,14 +65,14 @@
         .actual-price { font-size: 15px; font-weight: 800; color: #000; }
         .mrp-cross { font-size: 11px; color: #999; text-decoration: line-through; }
 
-        /* Real BB Square Add Controller Box */
+        /* Working ADD/REMOVE Systems */
         .add-action-box { width: 68px; height: 28px; position: relative; }
         .bb-ui-add-btn { width: 100%; height: 100%; background: white; color: #ff3f6c; border: 1px solid #ff3f6c; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
         .bb-ui-qty-box { display: none; width: 100%; height: 100%; background: var(--bb-green); color: white; border-radius: 6px; justify-content: space-between; align-items: center; overflow: hidden; }
         .bb-qty-btn { background: transparent; border: none; color: white; width: 22px; height: 100%; font-size: 14px; font-weight: bold; cursor: pointer; }
         .bb-qty-num { font-size: 12px; font-weight: 700; }
 
-        /* Dynamic Shell Profile Container View */
+        /* Dynamic Profile Sheets */
         .account-panel-wrapper { display: none; padding: 16px; }
         .profile-card-shell { background: white; border-radius: 16px; padding: 20px; border: 1px solid #eef0f2; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
         .profile-left-node { display: flex; align-items: center; gap: 14px; }
@@ -88,35 +87,29 @@
 
         .account-list-menu { background: white; border-radius: 12px; border: 1px solid #eef0f2; overflow: hidden; }
         .list-menu-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f5f6f7; cursor: pointer; font-size: 14px; font-weight: 600; color: #444; }
-        .list-menu-item:last-child { border-bottom: none; }
-        .list-menu-item::after { content: "›"; font-size: 20px; color: #ccc; font-weight: 300; }
+        .list-menu-item::after { content: "›"; font-size: 20px; color: #ccc; }
 
-        /* Sticky Real Overlay Navigation Panel Floating Widgets */
-        .bottom-widgets-layer { position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px 12px 16px; pointer-events: none; z-index: 99999; }
-        
-        .free-delivery-badge { background: #eaf5d6; color: #4e820d; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 8px; border: 1px solid #d4ebd2; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 6px; pointer-events: auto; }
-        .free-delivery-badge::before { content: "🛡️"; }
-
+        /* Bottom Floating Order Action Widgets */
+        .bottom-widgets-layer { position: fixed; bottom: 65px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px; pointer-events: none; z-index: 99999; }
+        .free-delivery-badge { background: #eaf5d6; color: #4e820d; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 8px; border: 1px solid #d4ebd2; box-shadow: 0 2px 8px rgba(0,0,0,0.05); pointer-events: auto; }
         .app-checkout-pill { background: #0c3e19; color: white; width: 100%; border-radius: 30px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(12, 62, 25, 0.35); cursor: pointer; pointer-events: auto; }
         .checkout-pill-left { display: flex; align-items: center; gap: 10px; }
         .checkout-pill-bag { background: rgba(255,255,255,0.15); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; }
         .checkout-pill-bill { font-size: 16px; font-weight: 800; }
-        .checkout-pill-count { font-size: 12px; opacity: 0.8; font-weight: 500; }
-        .checkout-pill-right { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .checkout-pill-count { font-size: 11px; opacity: 0.8; }
+        .checkout-pill-right { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Real Bottom Navigation App Tabs */
-        .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px 0; z-index: 9999; box-shadow: 0 -2px 10px rgba(0,0,0,0.02); }
+        /* Real Footer Strip Nav Tabs */
+        .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 0; z-index: 99999; box-shadow: 0 -2px 10px rgba(0,0,0,0.03); }
         .nav-tab-node { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: #888; }
         .nav-tab-node.active { color: var(--bb-green); }
-        .nav-tab-icon { font-size: 20px; }
+        .nav-tab-icon { font-size: 18px; }
         .nav-tab-lbl { font-size: 10px; font-weight: 700; }
-
-        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
 
-    <!-- Fixed Header Core Layout -->
+    <!-- Header Frame Shell -->
     <div class="bb-sticky-header" id="header-shell">
         <div class="delivery-row">
             <div>
@@ -128,16 +121,16 @@
         <div class="search-container">
             <div class="search-bar-inner">
                 <span class="search-icon">🔍</span>
-                <input type="text" class="search-input" id="bb-search-box" placeholder="Search for 'chips', 'milk', 'bread'...">
+                <input type="text" class="search-input" id="bb-search-box" placeholder="Search for products (milk, biscuit, chips)..." value="biscuit">
             </div>
             <button class="search-action-btn" onclick="executeAppSearch()">Search</button>
         </div>
         <div class="horizontal-tabs">
-            <div class="tab-item active" onclick="quickFilterCategory(this, 'milk')">
-                <div class="tab-icon-frame">🥛</div><div class="tab-label">Fresh</div>
+            <div class="tab-item active" onclick="quickFilterCategory(this, 'biscuit')">
+                <div class="tab-icon-frame">🍪</div><div class="tab-label">Fresh</div>
             </div>
-            <div class="tab-item" onclick="quickFilterCategory(this, 'atta')">
-                <div class="tab-icon-frame">🌾</div><div class="tab-label">Grocery</div>
+            <div class="tab-item" onclick="quickFilterCategory(this, 'milk')">
+                <div class="tab-icon-frame">🥛</div><div class="tab-label">Grocery</div>
             </div>
             <div class="tab-item" onclick="quickFilterCategory(this, 'electronics')">
                 <div class="tab-icon-frame">🔌</div><div class="tab-label">Electronics</div>
@@ -148,25 +141,19 @@
         </div>
     </div>
 
-    <!-- MAIN HOME VIEW PANEL -->
+    <!-- MAIN VIEWS LAYER -->
     <div id="view-home">
-        <!-- Interactive Banner Slider Frame -->
         <div class="promo-banner-space" id="promo-banner-node">
-            <img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="banner" onerror="this.src='https://www.bigbasket.com/media/uploads/banner_images/B2C051406781-12715-4v-m-hp.jpg'">
+            <img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="banner">
         </div>
-
         <div class="section-header-title">
             <span id="catalog-title-lbl">Bestsellers</span>
             <span class="see-all-link">View more ›</span>
         </div>
-
-        <!-- 2-Column Responsive Matrix Grid Container -->
-        <div class="product-grid-container" id="catalog-grid-root">
-            <!-- Dynamic elements injection context -->
-        </div>
+        <div class="product-grid-container" id="catalog-grid-root"></div>
     </div>
 
-    <!-- ACCOUNT PROFILE PANEL VIEW -->
+    <!-- PROFILE MANAGEMENT LAYER -->
     <div id="view-account" class="account-panel-wrapper">
         <div class="profile-card-shell">
             <div class="profile-left-node">
@@ -176,32 +163,22 @@
                     <div class="user-meta-contact" id="user-profile-handle">@rkg26176</div>
                 </div>
             </div>
-            <div style="font-size: 18px; cursor: pointer;">✏️</div>
+            <div style="font-size: 16px;">✏️</div>
         </div>
-
         <div class="account-navigation-grid">
-            <div class="nav-square-card">
-                <div class="nav-square-icon">📋</div><div class="nav-square-lbl">Orders</div>
-            </div>
-            <div class="nav-square-card">
-                <div class="nav-square-icon">💼</div><div class="nav-square-lbl">BBWallet</div>
-            </div>
-            <div class="nav-square-card">
-                <div class="nav-square-icon">📍</div><div class="nav-square-lbl">Address</div>
-            </div>
+            <div class="nav-square-card"><div class="nav-square-icon">📋</div><div class="nav-square-lbl">Orders</div></div>
+            <div class="nav-square-card"><div class="nav-square-icon">💼</div><div class="nav-square-lbl">BBWallet</div></div>
+            <div class="nav-square-card"><div class="nav-square-icon">📍</div><div class="nav-square-lbl">Address</div></div>
         </div>
-
         <div class="account-list-menu">
             <div class="list-menu-item">My Wishlist</div>
             <div class="list-menu-item">Shopping lists</div>
             <div class="list-menu-item">Saved Payments</div>
             <div class="list-menu-item">Ratings & Reviews</div>
-            <div class="list-menu-item">NeuCard</div>
-            <div class="list-menu-item">Support & FAQs</div>
         </div>
     </div>
 
-    <!-- Premium Floating Interactive Overlay Widget Sheets -->
+    <!-- Floating Order System Overlay Bar Sheets -->
     <div class="bottom-widgets-layer" id="checkout-sheet-widget" style="display: none;">
         <div class="free-delivery-badge">You've unlocked FREE delivery</div>
         <div class="app-checkout-pill" onclick="processFinalCheckout()">
@@ -209,14 +186,14 @@
                 <div class="checkout-pill-bag">🛍️</div>
                 <div>
                     <div class="checkout-pill-bill" id="checkout-total-val">₹0</div>
-                    <div class="checkout-pill-count" id="checkout-count-val">0 Items added</div>
+                    <div class="checkout-pill-count" id="checkout-count-val">0 Items</div>
                 </div>
             </div>
             <div class="checkout-pill-right">Place Order →</div>
         </div>
     </div>
 
-    <!-- Core App Footer Navigation Shell -->
+    <!-- Absolute App Bottom Navigation Shell -->
     <div class="app-bottom-navbar">
         <div class="nav-tab-node active" id="nav-home-node" onclick="switchNavTab('home')">
             <div class="nav-tab-icon">🏠</div><div class="nav-tab-lbl">Home</div>
@@ -237,7 +214,6 @@
         let applicationCart = {};
         let localizedBillSum = 0;
 
-        // Sync real-time authentication session context from Telegram window payload
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const runtimeUser = tg.initDataUnsafe.user;
             const completeName = (runtimeUser.first_name + " " + (runtimeUser.last_name || "")).trim() || "Rounak Kumar";
@@ -248,14 +224,11 @@
 
         function triggerManualLoc() {
             const editLoc = prompt("Change delivery location context:", "Home - house no. 3, Shanti nagar");
-            if(editLoc) {
-                document.getElementById('loc-lbl').innerText = editLoc.length > 30 ? editLoc.substring(0, 28) + "..." : editLoc;
-            }
+            if(editLoc) document.getElementById('loc-lbl').innerText = editLoc;
         }
 
         function switchNavTab(targetTab) {
-            document.querySelectorAll('.nav-tab-node').forEach(node => node.classList.remove('active'));
-            
+            document.querySelectorAll('.app-bottom-navbar .nav-tab-node').forEach(node => node.classList.remove('active'));
             if(targetTab === 'home') {
                 document.getElementById('nav-home-node').classList.add('active');
                 document.getElementById('header-shell').style.display = 'block';
@@ -268,7 +241,7 @@
                 document.getElementById('view-account').style.display = 'block';
             } else if(targetTab === 'categories_menu') {
                 document.getElementById('nav-cat-node').classList.add('active');
-                tg.showAlert("Opening real BigBasket global structural taxonomy matrix catalog panels...");
+                switchNavTab('home');
             }
         }
 
@@ -276,29 +249,42 @@
             document.querySelectorAll('.tab-item').forEach(item => item.classList.remove('active'));
             elem.classList.add('active');
             document.getElementById('bb-search-box').value = queryKey;
-            
-            // Context specific banner alterations to match original application behaviors
-            const banner = document.getElementById('promo-banner-node');
-            if(queryKey === 'organic') {
-                banner.innerHTML = `<img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_organic_250523_460.jpg" alt="organic">`;
-                document.getElementById('catalog-title-lbl').innerText = "Pure Organic Catalog";
-            } else if(queryKey === 'electronics') {
-                banner.innerHTML = `<img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_electronics_250523_460.jpg" alt="electronics">`;
-                document.getElementById('catalog-title-lbl').innerText = "Top Picks for Every Need";
-            } else {
-                banner.innerHTML = `<img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="default">`;
-                document.getElementById('catalog-title-lbl').innerText = "Bestsellers";
-            }
             executeAppSearch();
         }
 
         async function executeAppSearch() {
             const gridRoot = document.getElementById('catalog-grid-root');
-            const searchVal = document.getElementById('bb-search-box').value.trim();
+            const searchVal = document.getElementById('bb-search-box').value.trim().toLowerCase();
             if(!searchVal) return;
 
-            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Processing internal Scraper lookup hooks...</div>';
+            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Syncing with BigBasket Data Nodes...</div>';
 
+            // Safe robust data fallback arrays map to bypass network blockings instantly
+            const fallbackCatalog = {
+                "biscuit": [
+                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
+                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg", "wgt": "400 g"},
+                    {"title": "Sunfeast Dark Fantasy Choco Fills", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/40003154_6-sunfeast-dark-fantasy-choco-fills.jpg", "wgt": "75 g"}
+                ],
+                "milk": [
+                    {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg", "wgt": "1 L"},
+                    {"title": "Nandini Pasteurized Toned Milk 500 ml", "price": 24, "image": "https://www.bigbasket.com/media/uploads/p/l/30006479_3-nandini-pasteurized-toned-milk.jpg", "wgt": "500 ml"}
+                ],
+                "chips": [
+                    {"title": "Lays Chips - India's Magic Masala", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/294713_4-lays-potato-chips-indias-magic-masala.jpg", "wgt": "50 g"},
+                    {"title": "Pringles Potato Crisps - Original", "price": 115, "image": "https://www.bigbasket.com/media/uploads/p/l/40021379_7-pringles-potato-crisps-original.jpg", "wgt": "107 g"}
+                ],
+                "electronics": [
+                    {"title": "boAt Wave Call Smartwatch Active", "price": 1299, "image": "https://www.bigbasket.com/media/uploads/p/l/40293881_1-boat-wave-call-smartwatch.jpg", "wgt": "1 Unit"}
+                ],
+                "organic": [
+                    {"title": "Fresho Organic Pure Cow Ghee", "price": 390, "image": "https://www.bigbasket.com/media/uploads/p/l/40135851_4-fresho-organic-pure-cow-ghee.jpg", "wgt": "500 ml"}
+                ]
+            };
+
+            let products = [];
+            
             try {
-                const queryUrl = `/api/search?query=${encodeURIComponent(searchVal)}`;
-               
+                // Background runtime fetch loop attempt
+                const response = await fetch(`/api/search?query=${encodeURIComponent(searchVal)}`);
+                const resData 

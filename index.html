@@ -116,8 +116,8 @@
         <div class="delivery-row">
             <div>
                 <div class="eta-badge">⚡ 5 mins</div>
-                <!-- Default clean address text, click karne par secure dynamic prompt chalega -->
-                <div class="location-dropdown" id="loc-lbl" onclick="requestTelegramGPS()">Ranchi, India</div>
+                <!-- Dropdown layout, clicks are wrapped safely -->
+                <div class="location-dropdown" id="loc-lbl" onclick="triggerManualLoc()">Mumbai, Maharashtra</div>
             </div>
             <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
         </div>
@@ -216,7 +216,7 @@
 
         let applicationCart = {};
         let localizedBillSum = 0;
-        let finalGeoString = "Ranchi, Jharkhand";
+        let finalGeoString = "Mumbai, Maharashtra";
 
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const runtimeUser = tg.initDataUnsafe.user;
@@ -226,42 +226,36 @@
             document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
-        // --- SECURE FREEZE-PROOF TELEGRAM GEOLOCATION ACCESS ---
-        function requestTelegramGPS() {
-            const labelNode = document.getElementById('loc-lbl');
-            labelNode.innerText = "Requesting GPS...";
-
+        // Try automatic device location grab without letting the thread freeze if blocked
+        async function tryAutoLocationGrab() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     async (pos) => {
-                        const latitude = pos.coords.latitude;
-                        const longitude = pos.coords.longitude;
-                        
-                        finalGeoString = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-                        labelNode.innerText = `📍 Mock Fixed: ${finalGeoString}`;
-                        
-                        // Parse mock coordinates info via Osm Map
                         try {
-                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                            const lat = pos.coords.latitude;
+                            const lon = pos.coords.longitude;
+                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
                             const osmData = await res.json();
                             if (osmData && osmData.address) {
-                                const district = osmData.address.suburb || osmData.address.neighbourhood || osmData.address.suburb || "";
-                                const locationName = osmData.address.city || osmData.address.town || "Mumbai";
-                                const finalDisplay = `${district} ${locationName}`.trim();
-                                labelNode.innerText = finalDisplay.length > 28 ? finalDisplay.substring(0, 26) + "..." : finalDisplay;
-                                finalGeoString = osmData.display_name || finalGeoString;
+                                const district = osmData.address.suburb || osmData.address.neighbourhood || "";
+                                const city = osmData.address.city || osmData.address.town || "Mumbai";
+                                const shortAddress = `${district} ${city}`.trim();
+                                document.getElementById('loc-lbl').innerText = shortAddress.length > 28 ? shortAddress.substring(0, 26) + "..." : shortAddress;
+                                finalGeoString = osmData.display_name || shortAddress;
                             }
-                        } catch(e) { console.log("Lookup failure bypass active."); }
+                        } catch(e) { console.log("OSM API Blocked."); }
                     },
-                    (err) => {
-                        // User ne allow nahi kiya ya error aaya toh freeze nahi hoga, fallback values set ho jayengi
-                        labelNode.innerText = "Ranchi, India";
-                        tg.showAlert("Location access denied or timed out.");
-                    },
-                    { enableHighAccuracy: true, timeout: 5000 }
+                    (err) => { console.log("Sandbox Blocked Hardware Access."); },
+                    { timeout: 3000 }
                 );
-            } else {
-                labelNode.innerText = "Ranchi, India";
+            }
+        }
+
+        function triggerManualLoc() {
+            const editLoc = prompt("Change delivery destination context manually:", finalGeoString);
+            if(editLoc) {
+                document.getElementById('loc-lbl').innerText = editLoc.length > 28 ? editLoc.substring(0, 26) + "..." : editLoc;
+                finalGeoString = editLoc;
             }
         }
 
@@ -297,4 +291,7 @@
 
             gridRoot.innerHTML = '<div class="shimmer-state">🔄 Syncing with BigBasket Data Nodes...</div>';
 
-        
+            const fallbackCatalog = {
+                "biscuit": [
+                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
+                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bre

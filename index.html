@@ -3,113 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>bigbasket - Online Grocery Store</title>
+    <title>bigbasket - Online Grocery</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --bb-green: #84c225;
-            --bb-dark-green: #689f1e;
-            --text-main: #222222;
-            --text-muted: #777777;
-            --bg-body: #f4f3f2;
-            --border-color: #e8e7e6;
+            --bb-dark: #000000;
+            --bb-light-bg: #f5f6f7;
+            --bb-pill-bg: #eaf5d6;
+            --bb-pill-text: #4e820d;
         }
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { margin: 0; background-color: var(--bg-body); color: var(--text-main); padding-bottom: 90px; }
+        body { margin: 0; padding: 0; background-color: var(--bb-light-bg); color: #333; overflow-x: hidden; padding-bottom: 120px; }
         
-        .bb-nav { background: white; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
-        .brand-logo { font-size: 22px; font-weight: 900; color: var(--bb-green); letter-spacing: -0.5px; }
+        /* Fixed Real Top Shell */
+        .bb-sticky-header { position: sticky; top: 0; background: white; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
+        .delivery-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 4px 16px; }
+        .eta-badge { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 4px; color: var(--bb-dark); }
+        .location-dropdown { font-size: 13px; font-weight: 600; color: #555; display: flex; align-items: center; margin-top: 2px; cursor: pointer; }
+        .location-dropdown::after { content: " ▾"; color: #888; font-size: 14px; }
         
-        .sub-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: #fdfdfd; font-size: 13px; border-bottom: 1px solid var(--border-color); gap: 10px; }
-        .location-box { display: flex; flex-direction: column; flex: 1; }
-        .location-current { font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .location-actions { display: flex; gap: 8px; margin-top: 4px; }
-        .loc-btn { background: transparent; border: none; padding: 2px 0; font-size: 11px; color: var(--bb-dark-green); font-weight: 700; cursor: pointer; text-transform: uppercase; }
-        
-        .profile-section { display: flex; align-items: center; background: #f0f2f5; padding: 4px 8px; border-radius: 20px; border: 1px solid #e0e0e0; }
-        .profile-avatar { width: 22px; height: 22px; background: var(--bb-green); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; margin-right: 6px; }
-        .profile-uid { font-size: 11px; font-weight: 600; color: #555; }
+        .profile-btn { width: 34px; height: 34px; background: #f0f1f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #555; cursor: pointer; border: 1px solid #e2e3e4; }
 
-        .search-box-wrapper { padding: 12px 16px; background: white; }
-        .search-bar-inner { display: flex; background: #f0f2f5; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden; }
-        .search-input { flex: 1; border: none; background: transparent; padding: 10px 12px; font-size: 14px; outline: none; }
-        .search-submit-btn { background: var(--bb-green); color: white; border: none; padding: 0 18px; font-weight: bold; cursor: pointer; }
+        /* Search Shell Component */
+        .search-container { padding: 8px 16px 12px 16px; display: flex; gap: 10px; align-items: center; }
+        .search-bar-inner { flex: 1; background: #f0f2f4; border-radius: 10px; border: 1px solid #e6e8ea; display: flex; align-items: center; padding: 0 12px; }
+        .search-icon { color: #888; font-size: 16px; margin-right: 8px; }
+        .search-input { width: 100%; border: none; background: transparent; padding: 10px 0; font-size: 14px; outline: none; color: #222; }
+        .search-action-btn { background: var(--bb-green); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
 
-        .categories-slider { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; background: white; margin-bottom: 8px; scrollbar-width: none; }
-        .categories-slider::-webkit-scrollbar { display: none; }
-        .cat-chip { background: #f5f5f5; padding: 6px 14px; border-radius: 15px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid #e0e0e0; cursor: pointer; }
-        .cat-chip.active { background: var(--bb-green); color: white; border-color: var(--bb-green); }
+        /* Top horizontal chips row */
+        .horizontal-tabs { display: flex; gap: 12px; overflow-x: auto; padding: 8px 16px 12px 16px; scrollbar-width: none; background: white; border-bottom: 1px solid #eef0f2; }
+        .horizontal-tabs::-webkit-scrollbar { display: none; }
+        .tab-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; min-width: 55px; opacity: 0.6; transition: all 0.2s; }
+        .tab-item.active { opacity: 1; }
+        .tab-icon-frame { width: 44px; height: 44px; background: #f5f6f8; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 1px solid transparent; }
+        .tab-item.active .tab-icon-frame { background: white; border-color: #ddd; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .tab-label { font-size: 11px; font-weight: 700; text-align: center; color: #222; }
 
-        .main-container { padding: 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .item-card { background: white; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e9e9e9; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .img-container { width: 100%; height: 110px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; background: #fafafa; border-radius: 4px; overflow: hidden; }
-        .item-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        
-        .brand-name { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 2px; }
-        .item-title { font-size: 13px; font-weight: 500; color: #333; line-height: 1.3; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 8px; }
-        
-        .pricing-row { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 6px; }
-        .price-val { font-size: 16px; font-weight: 700; color: #000; }
-        
-        .action-box { width: 75px; height: 30px; }
-        .card-add-btn { width: 100%; height: 100%; background: white; color: #ff3f6c; border: 1px solid #ff3f6c; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer; text-transform: uppercase; }
-        .card-qty-box { display: none; width: 100%; height: 100%; background: var(--bb-green); color: white; border-radius: 4px; justify-content: space-between; align-items: center; }
-        .qty-control-btn { background: transparent; border: none; color: white; width: 24px; height: 100%; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .qty-num { font-size: 13px; font-weight: bold; }
+        /* Banner Slider Component */
+        .promo-banner-space { padding: 12px 16px; background: white; display: block; }
+        .bb-fluid-banner { width: 100%; border-radius: 12px; display: block; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
 
-        .bottom-basket-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border-color); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -4px 15px rgba(0,0,0,0.08); z-index: 999; }
-        .basket-info { display: flex; flex-direction: column; }
-        .basket-items-count { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-        .basket-total-amt { font-size: 20px; font-weight: 800; color: #111; margin-top: 2px; }
-        .checkout-action-btn { background: var(--bb-green); color: white; border: none; padding: 12px 32px; border-radius: 6px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        /* Main Catalog Title */
+        .section-header-title { padding: 16px 16px 6px 16px; font-size: 16px; font-weight: 800; color: #000; display: flex; justify-content: space-between; align-items: center; }
+        .see-all-link { font-size: 13px; color: var(--bb-green); font-weight: 700; cursor: pointer; }
+
+        /* 2-Column Product Cards Grid Layout */
+        .product-grid-container { padding: 0 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .bb-product-card { background: white; border-radius: 12px; padding: 12px; border: 1px solid #eef0f2; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+        .discount-tag { position: absolute; top: 8px; left: 8px; background: #fdf0f0; color: #d93838; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
         
-        .loading-shimmer { grid-column: span 2; text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
+        .card-media-wrapper { width: 100%; height: 110px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; padding: 6px; }
+        .card-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        .product-meta-brand { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #999; margin-bottom: 2px; }
+        .product-meta-title { font-size: 13px; font-weight: 600; color: #222; line-height: 1.3; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 4px; }
+        .product-meta-wgt { font-size: 11px; color: #777; font-weight: 500; margin-bottom: 8px; }
+
+        .card-footer-pricing { display: flex; justify-content: space-between; align-items: center; margin-top: auto; border-top: 1px dashed #f5f6f7; padding-top: 8px; }
+        .price-block { display: flex; flex-direction: column; }
+        .actual-price { font-size: 15px; font-weight: 800; color: #000; }
+        .mrp-cross { font-size: 11px; color: #999; text-decoration: line-through; }
+
+        /* Real BB Square Add Controller Box */
+        .add-action-box { width: 68px; height: 28px; position: relative; }
+        .bb-ui-add-btn { width: 100%; height: 100%; background: white; color: #ff3f6c; border: 1px solid #ff3f6c; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .bb-ui-qty-box { display: none; width: 100%; height: 100%; background: var(--bb-green); color: white; border-radius: 6px; justify-content: space-between; align-items: center; overflow: hidden; }
+        .bb-qty-btn { background: transparent; border: none; color: white; width: 22px; height: 100%; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .bb-qty-num { font-size: 12px; font-weight: 700; }
+
+        /* Dynamic Shell Profile Container View */
+        .account-panel-wrapper { display: none; padding: 16px; }
+        .profile-card-shell { background: white; border-radius: 16px; padding: 20px; border: 1px solid #eef0f2; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .profile-left-node { display: flex; align-items: center; gap: 14px; }
+        .profile-large-avatar { width: 48px; height: 48px; background: #eaf5d6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--bb-green); font-weight: 800; }
+        .user-meta-name { font-size: 18px; font-weight: 800; color: #111; }
+        .user-meta-contact { font-size: 12px; color: #777; margin-top: 2px; font-weight: 500; }
+        
+        .account-navigation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .nav-square-card { background: white; border-radius: 12px; padding: 14px; border: 1px solid #eef0f2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; cursor: pointer; }
+        .nav-square-icon { font-size: 20px; }
+        .nav-square-lbl { font-size: 12px; font-weight: 700; color: #333; }
+
+        .account-list-menu { background: white; border-radius: 12px; border: 1px solid #eef0f2; overflow: hidden; }
+        .list-menu-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f5f6f7; cursor: pointer; font-size: 14px; font-weight: 600; color: #444; }
+        .list-menu-item:last-child { border-bottom: none; }
+        .list-menu-item::after { content: "›"; font-size: 20px; color: #ccc; font-weight: 300; }
+
+        /* Sticky Real Overlay Navigation Panel Floating Widgets */
+        .bottom-widgets-layer { position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px 12px 16px; pointer-events: none; z-index: 99999; }
+        
+        .free-delivery-badge { background: #eaf5d6; color: #4e820d; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 8px; border: 1px solid #d4ebd2; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 6px; pointer-events: auto; }
+        .free-delivery-badge::before { content: "🛡️"; }
+
+        .app-checkout-pill { background: #0c3e19; color: white; width: 100%; border-radius: 30px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(12, 62, 25, 0.35); cursor: pointer; pointer-events: auto; }
+        .checkout-pill-left { display: flex; align-items: center; gap: 10px; }
+        .checkout-pill-bag { background: rgba(255,255,255,0.15); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .checkout-pill-bill { font-size: 16px; font-weight: 800; }
+        .checkout-pill-count { font-size: 12px; opacity: 0.8; font-weight: 500; }
+        .checkout-pill-right { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Real Bottom Navigation App Tabs */
+        .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px 0; z-index: 9999; box-shadow: 0 -2px 10px rgba(0,0,0,0.02); }
+        .nav-tab-node { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: #888; }
+        .nav-tab-node.active { color: var(--bb-green); }
+        .nav-tab-icon { font-size: 20px; }
+        .nav-tab-lbl { font-size: 10px; font-weight: 700; }
+
+        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
 
-    <div class="bb-nav">
-        <div class="top-bar">
-            <div class="brand-logo">bigbasket</div>
-            <div style="font-size: 18px;">🛒</div>
-        </div>
-        
-        <div class="sub-header">
-            <div class="location-box">
-                <div class="location-current" id="address-display">📍 Ranchi, Jharkhand, 834001</div>
-                <div class="location-actions">
-                    <button class="loc-btn" onclick="autoDetectLoc()">⚡ Auto-Detect</button>
-                    <button class="loc-btn" style="color:#555;" onclick="manualSetLoc()">✍️ Set Manually</button>
-                </div>
+    <!-- Fixed Header Core Layout -->
+    <div class="bb-sticky-header" id="header-shell">
+        <div class="delivery-row">
+            <div>
+                <div class="eta-badge">⚡ 5 mins</div>
+                <div class="location-dropdown" id="loc-lbl" onclick="triggerManualLoc()">Home - house no. 3, Shanti nagar...</div>
             </div>
-            <div class="profile-section">
-                <div class="profile-avatar" id="avatar-char">BB</div>
-                <div class="profile-uid" id="uid-display">BB_GUEST</div>
-            </div>
+            <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
         </div>
-
-        <div class="search-box-wrapper">
+        <div class="search-container">
             <div class="search-bar-inner">
-                <input type="text" class="search-input" id="search-field" placeholder="Search products..." value="milk">
-                <button class="search-submit-btn" onclick="triggerSearch()">Search</button>
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="bb-search-box" placeholder="Search for 'chips', 'milk', 'bread'...">
             </div>
+            <button class="search-action-btn" onclick="executeAppSearch()">Search</button>
         </div>
-        <div class="categories-slider">
-            <div class="cat-chip active" onclick="quickFilter(this, 'milk')">Milk & Dairy</div>
-            <div class="cat-chip" onclick="quickFilter(this, 'bread')">Bread & Bakery</div>
-            <div class="cat-chip" onclick="quickFilter(this, 'tomato')">Vegetables</div>
+        <div class="horizontal-tabs">
+            <div class="tab-item active" onclick="quickFilterCategory(this, 'milk')">
+                <div class="tab-icon-frame">🥛</div><div class="tab-label">Fresh</div>
+            </div>
+            <div class="tab-item" onclick="quickFilterCategory(this, 'atta')">
+                <div class="tab-icon-frame">🌾</div><div class="tab-label">Grocery</div>
+            </div>
+            <div class="tab-item" onclick="quickFilterCategory(this, 'electronics')">
+                <div class="tab-icon-frame">🔌</div><div class="tab-label">Electronics</div>
+            </div>
+            <div class="tab-item" onclick="quickFilterCategory(this, 'organic')">
+                <div class="tab-icon-frame">🥗</div><div class="tab-label">Organic</div>
+            </div>
         </div>
     </div>
 
-    <div class="main-container" id="grid-root"></div>
-
-    <div class="bottom-basket-sheet">
-        <div class="basket-info">
-            <span class="basket-items-count" id="sheet-qty-lbl">0 ITEMS</span>
-            <div class="basket-total-amt" id="sheet-total-lbl">₹0</div>
+    <!-- MAIN HOME VIEW PANEL -->
+    <div id="view-home">
+        <!-- Interactive Banner Slider Frame -->
+        <div class="promo-banner-space" id="promo-banner-node">
+            <img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="banner" onerror="this.src='https://www.bigbasket.com/media/uploads/banner_images/B2C051406781-12715-4v-m-hp.jpg'">
         </div>
-        <button class="checkout-action-btn" onclick="handleCheckout()">View Basket</button>
+
+        <div class="section-header-title">
+            <span id="catalog-title-lbl">Bestsellers</span>
+            <span class="see-all-link">View more ›</span>
+        </div>
+
+        <!-- 2-Column Responsive Matrix Grid Container -->
+        <div class="product-grid-container" id="catalog-grid-root">
+            <!-- Dynamic elements injection context -->
+        </div>
+    </div>
+
+    <!-- ACCOUNT PROFILE PANEL VIEW -->
+    <div id="view-account" class="account-panel-wrapper">
+        <div class="profile-card-shell">
+            <div class="profile-left-node">
+                <div class="profile-large-avatar" id="avatar-initial">R</div>
+                <div>
+                    <div class="user-meta-name" id="user-profile-name">Rounak Kumar</div>
+                    <div class="user-meta-contact" id="user-profile-handle">@rkg26176</div>
+                </div>
+            </div>
+            <div style="font-size: 18px; cursor: pointer;">✏️</div>
+        </div>
+
+        <div class="account-navigation-grid">
+            <div class="nav-square-card">
+                <div class="nav-square-icon">📋</div><div class="nav-square-lbl">Orders</div>
+            </div>
+            <div class="nav-square-card">
+                <div class="nav-square-icon">💼</div><div class="nav-square-lbl">BBWallet</div>
+            </div>
+            <div class="nav-square-card">
+                <div class="nav-square-icon">📍</div><div class="nav-square-lbl">Address</div>
+            </div>
+        </div>
+
+        <div class="account-list-menu">
+            <div class="list-menu-item">My Wishlist</div>
+            <div class="list-menu-item">Shopping lists</div>
+            <div class="list-menu-item">Saved Payments</div>
+            <div class="list-menu-item">Ratings & Reviews</div>
+            <div class="list-menu-item">NeuCard</div>
+            <div class="list-menu-item">Support & FAQs</div>
+        </div>
+    </div>
+
+    <!-- Premium Floating Interactive Overlay Widget Sheets -->
+    <div class="bottom-widgets-layer" id="checkout-sheet-widget" style="display: none;">
+        <div class="free-delivery-badge">You've unlocked FREE delivery</div>
+        <div class="app-checkout-pill" onclick="processFinalCheckout()">
+            <div class="checkout-pill-left">
+                <div class="checkout-pill-bag">🛍️</div>
+                <div>
+                    <div class="checkout-pill-bill" id="checkout-total-val">₹0</div>
+                    <div class="checkout-pill-count" id="checkout-count-val">0 Items added</div>
+                </div>
+            </div>
+            <div class="checkout-pill-right">Place Order →</div>
+        </div>
+    </div>
+
+    <!-- Core App Footer Navigation Shell -->
+    <div class="app-bottom-navbar">
+        <div class="nav-tab-node active" id="nav-home-node" onclick="switchNavTab('home')">
+            <div class="nav-tab-icon">🏠</div><div class="nav-tab-lbl">Home</div>
+        </div>
+        <div class="nav-tab-node" id="nav-cat-node" onclick="switchNavTab('categories_menu')">
+            <div class="nav-tab-icon">🗂️</div><div class="nav-tab-lbl">Categories</div>
+        </div>
+        <div class="nav-tab-node" id="nav-acc-node" onclick="switchNavTab('account')">
+            <div class="nav-tab-icon">👤</div><div class="nav-tab-lbl">My Account</div>
+        </div>
     </div>
 
     <script>
@@ -117,131 +234,71 @@
         tg.ready();
         tg.expand();
 
-        let shoppingCart = {};
-        let currentTotal = 0;
+        let applicationCart = {};
+        let localizedBillSum = 0;
 
+        // Sync real-time authentication session context from Telegram window payload
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            const tgUser = tg.initDataUnsafe.user;
-            const displayName = tgUser.first_name || "User";
-            document.getElementById('uid-display').innerText = tgUser.username ? `@${tgUser.username}` : `ID: ${tgUser.id}`;
-            document.getElementById('avatar-char').innerText = displayName.charAt(0).toUpperCase();
+            const runtimeUser = tg.initDataUnsafe.user;
+            const completeName = (runtimeUser.first_name + " " + (runtimeUser.last_name || "")).trim() || "Rounak Kumar";
+            document.getElementById('user-profile-name').innerText = completeName;
+            document.getElementById('avatar-initial').innerText = completeName.charAt(0).toUpperCase();
+            document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
-        function autoDetectLoc() {
-            document.getElementById('address-display').innerText = "📍 Auto-Detected: Lalpur, Ranchi - 834001";
-            tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        function manualSetLoc() {
-            const newLoc = prompt("Enter your Delivery City or Pincode:", "Ranchi, 834001");
-            if(newLoc) {
-                document.getElementById('address-display').innerText = `📍 ${newLoc}`;
+        function triggerManualLoc() {
+            const editLoc = prompt("Change delivery location context:", "Home - house no. 3, Shanti nagar");
+            if(editLoc) {
+                document.getElementById('loc-lbl').innerText = editLoc.length > 30 ? editLoc.substring(0, 28) + "..." : editLoc;
             }
         }
 
-        function quickFilter(element, query) {
-            document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
-            element.classList.add('active');
-            document.getElementById('search-field').value = query;
-            triggerSearch();
+        function switchNavTab(targetTab) {
+            document.querySelectorAll('.nav-tab-node').forEach(node => node.classList.remove('active'));
+            
+            if(targetTab === 'home') {
+                document.getElementById('nav-home-node').classList.add('active');
+                document.getElementById('header-shell').style.display = 'block';
+                document.getElementById('view-home').style.display = 'block';
+                document.getElementById('view-account').style.display = 'none';
+            } else if(targetTab === 'account') {
+                document.getElementById('nav-acc-node').classList.add('active');
+                document.getElementById('header-shell').style.display = 'none';
+                document.getElementById('view-home').style.display = 'none';
+                document.getElementById('view-account').style.display = 'block';
+            } else if(targetTab === 'categories_menu') {
+                document.getElementById('nav-cat-node').classList.add('active');
+                tg.showAlert("Opening real BigBasket global structural taxonomy matrix catalog panels...");
+            }
         }
 
-        async function triggerSearch() {
-            const root = document.getElementById('grid-root');
-            const searchVal = document.getElementById('search-field').value.trim();
+        function quickFilterCategory(elem, queryKey) {
+            document.querySelectorAll('.tab-item').forEach(item => item.classList.remove('active'));
+            elem.classList.add('active');
+            document.getElementById('bb-search-box').value = queryKey;
+            
+            // Context specific banner alterations to match original application behaviors
+            const banner = document.getElementById('promo-banner-node');
+            if(queryKey === 'organic') {
+                banner.innerHTML = `<img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_organic_250523_460.jpg" alt="organic">`;
+                document.getElementById('catalog-title-lbl').innerText = "Pure Organic Catalog";
+            } else if(queryKey === 'electronics') {
+                banner.innerHTML = `<img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_electronics_250523_460.jpg" alt="electronics">`;
+                document.getElementById('catalog-title-lbl').innerText = "Top Picks for Every Need";
+            } else {
+                banner.innerHTML = `<img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="default">`;
+                document.getElementById('catalog-title-lbl').innerText = "Bestsellers";
+            }
+            executeAppSearch();
+        }
+
+        async function executeAppSearch() {
+            const gridRoot = document.getElementById('catalog-grid-root');
+            const searchVal = document.getElementById('bb-search-box').value.trim();
             if(!searchVal) return;
 
-            root.innerHTML = '<div class="loading-shimmer">🔄 Syncing inventory...</div>';
+            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Processing internal Scraper lookup hooks...</div>';
 
             try {
-                const response = await fetch(`/api/search?query=${encodeURIComponent(searchVal)}`);
-                const resData = await response.json();
-                
-                root.innerHTML = '';
-                if(!resData.products || resData.products.length === 0) {
-                    root.innerHTML = '<div class="loading-shimmer">❌ No items matched.</div>';
-                    return;
-                }
-
-                resData.products.forEach((prod, index) => {
-                    const uniqueId = `item_${index}`;
-                    const card = document.createElement('div');
-                    card.className = 'item-card';
-                    const cleanTitle = prod.title.replace(/'/g, "\\'");
-                    
-                    card.innerHTML = `
-                        <div class="brand-name">Fresho Custom</div>
-                        <div class="img-container">
-                            <img class="item-img" src="${prod.image}" alt="img" onerror="this.src='https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg'">
-                        </div>
-                        <div class="item-title">${prod.title}</div>
-                        <div class="pricing-row">
-                            <div class="price-val">₹${prod.price}</div>
-                            <div class="action-box">
-                                <button class="card-add-btn" id="add_btn_${uniqueId}" onclick="addItem('${uniqueId}', '${cleanTitle}', ${prod.price})">Add</button>
-                                <div class="card-qty-box" id="qty_box_${uniqueId}">
-                                    <button class="qty-control-btn" onclick="adjustQty('${uniqueId}', -1)">-</button>
-                                    <span class="qty-num" id="qty_num_${uniqueId}">1</span>
-                                    <button class="qty-control-btn" onclick="adjustQty('${uniqueId}', 1)">+</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    root.appendChild(card);
-                });
-            } catch (err) {
-                root.innerHTML = '<div class="loading-shimmer">⚠️ Error connecting to catalog.</div>';
-            }
-        }
-
-        function addItem(id, title, cost) {
-            shoppingCart[id] = { name: title, price: cost, qty: 1 };
-            document.getElementById(`add_btn_${id}`).style.display = 'none';
-            document.getElementById(`qty_box_${id}`).style.display = 'flex';
-            recalculateCart();
-        }
-
-        function adjustQty(id, change) {
-            if (!shoppingCart[id]) return;
-            shoppingCart[id].qty += change;
-            if (shoppingCart[id].qty <= 0) {
-                delete shoppingCart[id];
-                document.getElementById(`add_btn_${id}`).style.display = 'block';
-                document.getElementById(`qty_box_${id}`).style.display = 'none';
-            } else {
-                document.getElementById(`qty_num_${id}`).innerText = shoppingCart[id].qty;
-            }
-            recalculateCart();
-        }
-
-        function recalculateCart() {
-            let units = 0;
-            currentTotal = 0;
-            for (let k in shoppingCart) {
-                units += shoppingCart[k].qty;
-                currentTotal += (shoppingCart[k].price * shoppingCart[k].qty);
-            }
-            document.getElementById('sheet-qty-lbl').innerText = `${units} ${units === 1 ? 'ITEM' : 'ITEMS'}`;
-            document.getElementById('sheet-total-lbl').innerText = `₹${currentTotal}`;
-        }
-
-        function handleCheckout() {
-            if (Object.keys(shoppingCart).length === 0) {
-                tg.showAlert("Your cart is empty!");
-                return;
-            }
-            
-            // App ke andar hi Unique Random Order ID banana
-            const orderId = "BB" + Math.floor(100000 + Math.random() * 900000);
-            
-            // Bot ko bhejne ke liye sirf 2 parameters ka structured single text
-            const outputString = `ORDER_ID:${orderId}|TOTAL_BILL:₹${currentTotal}`;
-            
-            tg.sendData(outputString);
-            tg.close();
-        }
-
-        window.onload = triggerSearch;
-    </script>
-</body>
-</html>
+                const queryUrl = `/api/search?query=${encodeURIComponent(searchVal)}`;
+               

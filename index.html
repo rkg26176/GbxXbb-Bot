@@ -20,7 +20,7 @@
         .bb-sticky-header { position: sticky; top: 0; background: white; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
         .delivery-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 4px 16px; }
         .eta-badge { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 4px; color: var(--bb-dark); }
-        .location-dropdown { font-size: 13px; font-weight: 600; color: #555; display: flex; align-items: center; margin-top: 2px; cursor: pointer; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .location-dropdown { font-size: 13px; font-weight: 600; color: #555; display: flex; align-items: center; margin-top: 2px; cursor: pointer; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .location-dropdown::after { content: " ▾"; color: #888; font-size: 14px; }
         
         .profile-btn { width: 34px; height: 34px; background: #f0f1f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #555; cursor: pointer; border: 1px solid #e2e3e4; }
@@ -105,8 +105,6 @@
         .nav-tab-node.active { color: var(--bb-green); }
         .nav-tab-icon { font-size: 18px; }
         .nav-tab-lbl { font-size: 10px; font-weight: 700; }
-        
-        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -116,7 +114,8 @@
         <div class="delivery-row">
             <div>
                 <div class="eta-badge">⚡ 5 mins</div>
-                <div class="location-dropdown" id="loc-lbl" onclick="triggerManualLoc()">Ranchi, Jharkhand</div>
+                <!-- Interactive real location handler -->
+                <div class="location-dropdown" id="loc-lbl" onclick="requestTelegramGPS()">Requesting Location...</div>
             </div>
             <div class="profile-btn" onclick="switchNavTab('account')">👤</div>
         </div>
@@ -215,7 +214,7 @@
 
         let applicationCart = {};
         let localizedBillSum = 0;
-        let finalGeoString = "Ranchi, India";
+        let finalGeoString = "Ranchi, Jharkhand"; // Default safe target
 
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             const runtimeUser = tg.initDataUnsafe.user;
@@ -225,34 +224,40 @@
             document.getElementById('user-profile-handle').innerText = runtimeUser.username ? `@${runtimeUser.username}` : `ID: ${runtimeUser.id}`;
         }
 
-        // --- NATIVE TELEGRAM GEOLOCATION ACCESS PROTOCOL ---
-        function initTelegramLocation() {
-            try {
-                // Telegram native location service available validation check
-                if (tg.LocationManager) {
-                    tg.LocationManager.init(() => {
-                        if (tg.LocationManager.isLocationAvailable) {
-                            tg.LocationManager.getLocation((data) => {
-                                if (data && data.latitude) {
-                                    const lat = data.latitude;
-                                    const lon = data.longitude;
-                                    finalGeoString = `GPS [${lat.toFixed(5)}, ${lon.toFixed(5)}]`;
-                                    document.getElementById('loc-lbl').innerText = `📍 Live GPS Fixed`;
-                                }
-                            });
-                        }
-                    });
-                }
-            } catch (err) {
-                console.log("Telegram LocationManager initialization safety bypass active.");
-            }
-        }
+        // --- ASLI TELEGRAM BLUE DIALOG BOX REQUEST METHOD ---
+        function requestTelegramGPS() {
+            const labelNode = document.getElementById('loc-lbl');
+            labelNode.innerText = "Requesting System GPS...";
 
-        function triggerManualLoc() {
-            const editLoc = prompt("Manually override address text:", "Ranchi, Jharkhand");
-            if(editLoc) {
-                document.getElementById('loc-lbl').innerText = editLoc;
-                finalGeoString = editLoc;
+            // standard HTML5 geolocation interface call directly to handle phone mocked GPS engines properly
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        const latitude = pos.coords.latitude;
+                        const longitude = pos.coords.longitude;
+                        
+                        finalGeoString = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+                        labelNode.innerText = `📍 Fixed: ${finalGeoString}`;
+                        
+                        // Parse mock coordinates details via public reverse lookup pipeline
+                        try {
+                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                            const osmData = await res.json();
+                            if (osmData && osmData.address) {
+                                const district = osmData.address.suburb || osmData.address.neighbourhood || osmData.address.city_district || "";
+                                const locationName = osmData.address.city || osmData.address.town || "Mumbai";
+                                const finalDisplay = `${district} ${locationName}`.trim();
+                                labelNode.innerText = finalDisplay.length > 28 ? finalDisplay.substring(0, 26) + "..." : finalDisplay;
+                                finalGeoString = osmData.display_name || finalGeoString;
+                            }
+                        } catch(e) { console.log("Lookup failure bypass active."); }
+                    },
+                    (err) => {
+                        labelNode.innerText = "Ranchi, Jharkhand (Default)";
+                        tg.showAlert("Please check device GPS configurations or mock options.");
+                    },
+                    { enableHighAccuracy: true, timeout: 6000 }
+                );
             }
         }
 
@@ -286,14 +291,8 @@
             const searchVal = document.getElementById('bb-search-box').value.trim().toLowerCase();
             if(!searchVal) return;
 
-            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Syncing with BigBasket Data Nodes...</div>';
+            gridRoot.innerHTML = '<div class="shimmer-state">🔄 Processing internal Scraper lookup hooks...</div>';
 
             const fallbackCatalog = {
                 "biscuit": [
-                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
-                    {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg", "wgt": "400 g"},
-                    {"title": "Sunfeast Dark Fantasy Choco Fills", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/40003154_6-sunfeast-dark-fantasy-choco-fills.jpg", "wgt": "75 g"}
-                ],
-                "milk": [
-                    {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg", "wgt": "1 L"},
-                    {"title": "Nandini Pasteurized Toned Milk 500 ml", "price": 24, "image":
+                    {"title": "Cadbury Dairy Milk Chocolate Bar", "price": 20, "image": "https://www.bigba

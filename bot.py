@@ -1,12 +1,13 @@
 import os
 import logging
 import asyncio
+import uvicorn
 from fastapi import FastAPI, Request, Response
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging setup Render console panel ke liye
+# Logging setup Render console verification ke liye
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 # --- GLOBAL CORE CONFIGURATIONS ---
@@ -31,7 +32,6 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
-# Global instances initialized inside modern setup
 bot_app = None
 
 async def verify_user_membership(user_id: int) -> bool:
@@ -123,12 +123,11 @@ async def process_menu_clicks(update: Update, context: ContextTypes.DEFAULT_TYPE
 # --- FASTAPI WEBHOOK INTEGRATION SETUP ---
 api_app = FastAPI()
 
-# Lifespan logic replaced with standard global initialization hooks to ensure clean uvicorn start
 @api_app.on_event("startup")
 async def initialize_webhook_routing():
     global bot_app
     TOKEN = os.getenv("BOT_TOKEN")
-    RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")  # Render automatically provides this domain variable
+    RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
     
     if not TOKEN or not RENDER_URL:
         logging.critical("CRITICAL: Environment mapping values for BOT_TOKEN or RENDER_EXTERNAL_URL are missing!")
@@ -136,7 +135,6 @@ async def initialize_webhook_routing():
         
     bot_app = Application.builder().token(TOKEN).build()
     
-    # Injection mapping handlers setup
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_menu_clicks))
@@ -144,12 +142,10 @@ async def initialize_webhook_routing():
     await bot_app.initialize()
     await bot_app.start()
     
-    # Setting target URL link webhook directly to the Render endpoint domain setup
     webhook_target_path = f"{RENDER_URL}/telegram-webhook"
     await bot_app.bot.set_webhook(url=webhook_target_path)
     logging.info(f"Webhook securely bound to target location endpoint: {webhook_target_path}")
 
-# Telegram server alerts data router endpoint mapping target
 @api_app.post("/telegram-webhook")
 async def process_telegram_incoming_payload(request: Request):
     global bot_app

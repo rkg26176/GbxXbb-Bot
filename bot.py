@@ -1,12 +1,14 @@
 import os
 import logging
 import asyncio
+import contextlib
+import uvicorn
 from fastapi import FastAPI
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging setup Render verification panel ke liye
+# Logging setup Render console panel ke liye
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 # --- GLOBAL CORE CONFIGURATIONS ---
@@ -31,10 +33,8 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
-# Variable placeholder for execution
 bot_app = None
 
-# Membership validation block
 async def verify_user_membership(user_id: int) -> bool:
     global bot_app
     if not bot_app:
@@ -49,7 +49,6 @@ async def verify_user_membership(user_id: int) -> bool:
             return False
     return True
 
-# Force Join Prompt Layout
 async def show_force_join_menu(update: Update):
     buttons = []
     for target in REQUIRED_TARGETS:
@@ -122,21 +121,19 @@ async def process_menu_clicks(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif user_text == "🏠 Home":
         await update.message.reply_text("Aap main dashboard home page par hi hain.")
 
-# --- FASTAPI ENGINE WITH INTEGRATED RUNTIME LOOP ---
-api_app = FastAPI()
-
-@api_app.on_event("startup")
-async def startup_event():
+# --- LIFESPAN ASYNC MANAGER (FIXES EXITED EARLY ERROR) ---
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
     global bot_app
     TOKEN = os.getenv("BOT_TOKEN")
     if not TOKEN:
-        logging.critical("CRITICAL: BOT_TOKEN mapping string array missing!")
+        logging.critical("CRITICAL: BOT_TOKEN mapping is missing!")
+        yield
         return
         
-    logging.info("Initializing embedded state loop architecture...")
+    logging.info("Initializing modern loop architecture...")
     bot_app = Application.builder().token(TOKEN).build()
     
-    # Handlers layout links injection
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_menu_clicks))
@@ -144,9 +141,24 @@ async def startup_event():
     await bot_app.initialize()
     await bot_app.start()
     await bot_app.updater.start_polling(drop_pending_updates=True)
-    logging.info("GbxXbb framework runtime cleanly bound to internal webhook engines.")
+    logging.info("GbxXbb bot runtime engine is active.")
+    
+    yield  # FastAPI runs normally here
+    
+    # Shutdown logic clean framework exit ke liye
+    logging.info("Shutting down bot application engines...")
+    await bot_app.updater.stop()
+    await bot_app.stop()
+    await bot_app.shutdown()
+
+# FastAPI init configuration using standard modern lifespan instead of deprecated on_event
+api_app = FastAPI(lifespan=lifespan)
 
 @api_app.get("/")
 def health_endpoint():
-    return {"status": "GbxXbb server is verified online"}
+    return {"status": "GbxXbb verification node online"}
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(api_app, host="0.0.0.0", port=port)
     

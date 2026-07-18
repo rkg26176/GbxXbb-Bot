@@ -9,9 +9,10 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
+# Primary log routing metrics
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- GLOBAL CHANNELS & GC CONFIGURATIONS ---
+# --- GLOBAL TARGET ACCESS SYSTEM CONFIGS ---
 REQUIRED_TARGETS = [
     -1003332858806, -1003630519339, -1003197501531, -1003862251237
 ]
@@ -75,30 +76,30 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# CLEAN DATA INTERCEPTOR (Sirf Order ID aur Payment Bill fetch karega)
+# TARGETED DATA STRING OVERRIDER (Stripping out JSON entirely from outside frames)
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw_text = update.effective_message.web_app_data.data
+    raw_payload_wire = update.effective_message.web_app_data.data
     
     try:
-        # Mini app se data is format me aayega -> ORDER_ID:BB123456|TOTAL_BILL:₹500
-        parts = raw_text.split("|")
-        order_id = parts[0].split(":")[1]
-        total_bill = parts[1].split(":")[1]
+        # Delimited segment processing pattern -> TX_REF:BB345678^FINAL_AMT:₹500
+        segmented_nodes = raw_payload_wire.split("^")
+        extracted_tx_code = segmented_nodes[0].split(":")[1]
+        extracted_final_bill = segmented_nodes[1].split(":")[1]
         
-        receipt = "🎉 **Order Placed Successfully!**\n"
-        receipt += "────────────────────────\n"
-        receipt += f"🆔 **Order ID:** `{order_id}`\n"
-        receipt += f"💵 **Total Bill Amount:** **{total_bill}**\n"
-        receipt += "────────────────────────\n"
-        receipt += "🚚 *Your package is being prepared for dispatch.*"
+        compiled_receipt = "🎉 **Order Placed Successfully!**\n"
+        compiled_receipt += "────────────────────────\n"
+        compiled_receipt += f"🆔 **Order ID:** `{extracted_tx_code}`\n"
+        compiled_receipt += f"💵 **Total Payment Due:** **{extracted_final_bill}**\n"
+        compiled_receipt += "────────────────────────\n"
+        compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
-        await update.message.reply_text(receipt, parse_mode="Markdown")
+        await update.message.reply_text(compiled_receipt, parse_mode="Markdown")
         
-    except Exception as e:
-        logging.error(f"Text processing error: {e}")
-        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Data:* {raw_text}")
+    except Exception as data_err:
+        logging.error(f"Fallback due to structural string variance: {data_err}")
+        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Payload Summary:* {raw_payload_wire}")
 
-# --- FASTAPI WEBHOOK AND PROXY INTEGRATION ---
+# --- FASTAPI SERVER MODULE & REVERSE PROXY SCRAPER LOGICS ---
 api_app = FastAPI()
 
 @api_app.get("/")
@@ -109,6 +110,7 @@ def home():
 def proxy_search(query: str = "milk", page: int = 1):
     api_key = os.getenv("PARSE_BOT_API_KEY")
     
+    # Real inventory mock array models aligned carefully to structural specs to fix image anomalies
     catalog_fallbacks = {
         "milk": [
             {"title": "Amul Taaza Toned Fresh Milk 1 L", "price": 56, "image": "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg"},
@@ -118,6 +120,10 @@ def proxy_search(query: str = "milk", page: int = 1):
             {"title": "English Oven Premium Sandwich Bread 400g", "price": 45, "image": "https://www.bigbasket.com/media/uploads/p/l/40075537_5-english-oven-bread-premium-sandwich.jpg"},
             {"title": "Bonn Premium White Bread Large 400g", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg"}
         ],
+        "chips": [
+            {"title": "Lays Potato Chips - India's Magic Masala 50g", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/294713_4-lays-potato-chips-indias-magic-masala.jpg"},
+            {"title": "Pringles Potato Crisps - Original 107g", "price": 115, "image": "https://www.bigbasket.com/media/uploads/p/l/40021379_7-pringles-potato-crisps-original.jpg"}
+        ],
         "tomato": [
             {"title": "Fresho Tomato - Local Fresh 1 kg", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/10000203_16-fresho-tomato-local.jpg"}
         ],
@@ -126,7 +132,17 @@ def proxy_search(query: str = "milk", page: int = 1):
         ]
     }
 
-    default_catalog = catalog_fallbacks["milk"] + catalog_fallbacks["bread"] + catalog_fallbacks["tomato"]
+    catalog_fallbacks["atta"] = [
+        {"title": "Aashirvaad Shudh Chakki Atta 5 kg", "price": 260, "image": "https://www.bigbasket.com/media/uploads/p/l/126906_8-aashirvaad-shudh-chakki-atta.jpg"}
+    ]
+    catalog_fallbacks["organic"] = [
+        {"title": "Fresho Organic Pure Cow Ghee 500 ml", "price": 390, "image": "https://www.bigbasket.com/media/uploads/p/l/40135851_4-fresho-organic-pure-cow-ghee.jpg"}
+    ]
+    catalog_fallbacks["electronics"] = [
+        {"title": "boAt Wave Call Smartwatch Active", "price": 1299, "image": "https://www.bigbasket.com/media/uploads/p/l/40293881_1-boat-wave-call-smartwatch.jpg"}
+    ]
+
+    default_catalog = catalog_fallbacks["milk"] + catalog_fallbacks["bread"] + catalog_fallbacks["chips"]
 
     if not api_key:
         matched = catalog_fallbacks.get(query.lower().strip())
@@ -147,7 +163,7 @@ def proxy_search(query: str = "milk", page: int = 1):
                 extracted_items = raw_data
             elif isinstance(raw_data, dict):
                 for key in ["results", "products", "data", "items"]:
-                    if isinstance(raw_data.get(key), list):
+                    if isinstance(raw_data.get(key), list) and len(raw_data.get(key)) > 0:
                         extracted_items = raw_data[key]
                         break
             
@@ -157,19 +173,19 @@ def proxy_search(query: str = "milk", page: int = 1):
 
             formatted_out = []
             for node in extracted_items[:20]:
-                title = node.get("title") or node.get("name") or "No Title"
-                price = node.get("price") or node.get("sale_price") or 45
+                title = node.get("title") or node.get("name") or "BigBasket Item"
+                price = node.get("price") or node.get("sale_price") or node.get("mrp") or 45
                 image = node.get("image") or node.get("image_url") or ""
                 
                 if not image or "placeholder" in image:
-                    image = "https://www.bigbasket.com/media/uploads/p/l/10000159_26-fresho-potato.jpg"
+                    image = "https://www.bigbasket.com/media/uploads/p/l/244335_2-amul-taaza-fresh-toned-milk.jpg"
                 
                 formatted_out.append({"title": title, "price": int(price), "image": image})
                 
             return {"products": formatted_out}
             
     except Exception as e:
-        logging.error(f"API Error: {e}")
+        logging.error(f"Exception handling on scraper middleware: {e}")
         matched = catalog_fallbacks.get(query.lower().strip())
         return {"products": matched if matched else default_catalog}
 

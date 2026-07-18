@@ -2,12 +2,12 @@ import os
 import logging
 import asyncio
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
-# Logging configuration for Render dashboard view
+# Logging configuration Render live tail ke liye
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 # --- GLOBAL SETTINGS ---
@@ -120,43 +120,48 @@ async def process_menu_clicks(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif user_text == "🏠 Home":
         await update.message.reply_text("Aap main dashboard home page par hi hain.")
 
-# --- FASTAPI APP SYSTEM ---
+# --- FASTAPI WEBHOOK LIFECYCLE ---
 api_app = FastAPI()
 
-@api_app.get("/")
-def home():
-    return {"status": "GbxXbb API Service Online"}
-
-# Clean asynchronous wrapper launcher block
-async def main_async_pipeline():
+@api_app.on_event("startup")
+async def init_webhook_mode():
     global bot_app
     TOKEN = os.getenv("BOT_TOKEN")
-    if not TOKEN:
-        logging.critical("BOT_TOKEN environment key is missing!")
+    URL = os.getenv("RENDER_EXTERNAL_URL")  # Render ka base URL automatically milta hai
+    
+    if not TOKEN or not URL:
+        logging.critical("CRITICAL: Environment variables missing!")
         return
 
-    # Native integration configuration sequence v20+
-    bot_app = Application.builder().token(TOKEN).build()
+    # Modern initialization pattern WITHOUT internal updater looping
+    bot_app = Application.builder().token(TOKEN).updater(None).build()
+    
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_menu_clicks))
-
-    # Clean non-blocking custom initialization loop logic
+    
     await bot_app.initialize()
     await bot_app.start()
     
-    # Starting standard server listener framework
-    port = int(os.getenv("PORT", 8000))
-    config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="warning")
-    server = uvicorn.Server(config)
-    
-    # Run loop updates alongside target bot server frameworks seamlessly
-    await asyncio.gather(
-        server.serve(),
-        bot_app.updater.start_polling(drop_pending_updates=True)
-    )
+    # Telegram ko batana ki requests is endpoint par bheje
+    webhook_url = f"{URL}/webhook"
+    await bot_app.bot.set_webhook(url=webhook_url)
+    logging.info(f"✅ Webhook successfully configured on: {webhook_url}")
+
+@api_app.post("/webhook")
+async def receive_telegram_update(request: Request):
+    global bot_app
+    if bot_app:
+        data = await request.json()
+        update = Update.de_json(data, bot_app.bot)
+        await bot_app.process_update(update)
+    return Response(status_code=200)
+
+@api_app.get("/")
+def health():
+    return {"status": "GbxXbb Webhook Gateway Live"}
 
 if __name__ == "__main__":
-    # Standard native loop runner trigger execution
-    asyncio.run(main_async_pipeline())
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(api_app, host="0.0.0.0", port=port)
     

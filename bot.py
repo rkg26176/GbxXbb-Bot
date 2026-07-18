@@ -75,12 +75,11 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# PARSING INCOMING REAL TIME GEOLOCATION PAYLOADS
+# PARSING INCOMING SECURE METADATA PAYLOAD WIRE
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
     
     try:
-        # String data structure input: TX_REF:BB400000^FINAL_AMT:₹500^LOC:Ranchi
         segmented_nodes = raw_payload_wire.split("^")
         extracted_tx_code = segmented_nodes[0].split(":")[1]
         extracted_final_bill = segmented_nodes[1].split(":")[1]
@@ -90,17 +89,17 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += f"🆔 **Order ID:** `{extracted_tx_code}`\n"
         compiled_receipt += f"💵 **Total Payment Due:** **{extracted_final_bill}**\n"
-        compiled_receipt += f"📍 **Real-Time GPS Address:**\n`{extracted_location}`\n"
+        compiled_receipt += f"📍 **Delivery Coordinates / Location:**\n`{extracted_location}`\n"
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
         await update.message.reply_text(compiled_receipt, parse_mode="Markdown")
         
     except Exception as data_err:
-        logging.error(f"Text processing error: {data_err}")
-        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Summary:* {raw_payload_wire}")
+        logging.error(f"Text processing wire parsing error: {data_err}")
+        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Summary Data Payload:* {raw_payload_wire}")
 
-# --- FASTAPI SERVER MODULE & APIS ---
+# --- FASTAPI SERVER MODULE & REVERSE PROXY SCRAPER LOGICS ---
 api_app = FastAPI()
 
 @api_app.get("/")

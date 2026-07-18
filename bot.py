@@ -19,9 +19,9 @@ REQUIRED_TARGETS = [
 ]
 
 TARGET_LINKS = {
-    -1003332858806: "https://t.me/gbx_loot_channel_username",   
-    -1003630519339: "https://t.me/gbx_earn_channel_username",   
-    -1003197501531: "https://t.me/gbx_zone_channel_username",   
+    -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
+    -1003630519339: "https://t.me/+OWrCoeF-JutmNjg1",   
+    -1003197501531: "https://t.me/+f2mWfDs6EUIxYTBl",   
     -1003862251237: "https://t.me/+O_-kEF2f5f1kMjdl"            
 }
 

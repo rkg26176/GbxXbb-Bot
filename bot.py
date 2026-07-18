@@ -75,7 +75,7 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# PARSING INCOMING SECURE METADATA PAYLOAD WIRE WITH LIVE MAP COORDINATES
+# PARSING INCOMING DATA PAYLOADS
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
     
@@ -89,7 +89,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += f"🆔 **Order ID:** `{extracted_tx_code}`\n"
         compiled_receipt += f"💵 **Total Payment Due:** **{extracted_final_bill}**\n"
-        compiled_receipt += f"📍 **Delivery Location Context:**\n`{extracted_location}`\n"
+        compiled_receipt += f"📍 **User Destination:**\n`{extracted_location}`\n"
         compiled_receipt += "────────────────────────\n"
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
@@ -99,7 +99,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         logging.error(f"Text processing wire parsing error: {data_err}")
         await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Summary Data Payload:* {raw_payload_wire}")
 
-# --- FASTAPI SERVER MODULE & APIS ---
+# --- FASTAPI SERVER MODULE ---
 api_app = FastAPI()
 
 @api_app.get("/")

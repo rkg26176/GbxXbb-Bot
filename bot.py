@@ -4,6 +4,7 @@ import urllib.request
 import urllib.parse
 import json
 import random
+import re
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -29,18 +30,19 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
-# Ledger Context Memory Layers
+# Production Databases
 USER_BALANCES = {}
 USER_STATES = {}
 PENDING_TX = {}
+USED_UTRS = set()  # To prevent duplicate UTR submissions
 
-# FIXED PRODUCTION ENDPOINT CREDENTIALS
+# BHARATPE PRODUCTION CONFIGURATION
 YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
 MERCHANT_NAME = "GBX Store Bar"
 
 bot_app = None
 
-# STRICT 5-BUTTON LAYOUT GENERATOR
+# STRICT 5-BUTTON MASTER MATRIX GRID
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
@@ -94,12 +96,19 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels aur GC join nahi kiye!", show_alert=True)
 
-# TEXT ROUTER INTERCEPTOR ENGINE
+# KEYBOARD BUTTON ACTIONS & TEXT INTERCEPTOR ENGINE
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
     
-    # Wallet State Validation Gate
+    # 🎯 MENU KEYBOARD COMMANDS LIST DETECTOR
+    MENU_COMMANDS = ["📱 My Accounts", "➕ New Login", "💰 Wallet", "🛠️ Customer Care"]
+    
+    # FIX ERROR 2: Agar user koi naya menu command dabata hai, toh balance add karne ki state cancel hokar naya command chalega!
+    if user_text in MENU_COMMANDS:
+        USER_STATES[user_id] = None  # Immediate State Flush Gate
+
+    # 1. State: Awaiting Amount Input Processing
     if USER_STATES.get(user_id) == "AWAITING_AMOUNT":
         try:
             amount = float(user_text)
@@ -107,33 +116,69 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
                 await update.message.reply_text("❌ **Payment Rejected!**\n\nMinimum deposit amount **₹10** hai. Kripya ₹10 ya usse zyada ka amount enter karein:", parse_mode="Markdown")
                 return
             
-            USER_STATES[user_id] = None # Flush input context state
+            USER_STATES[user_id] = None # Clear amount state
             
             tx_ref = f"GBX{user_id}X{random.randint(1000, 9999)}"
             encoded_name = urllib.parse.quote(MERCHANT_NAME)
             upi_payload = f"upi://pay?pa={YOUR_UPI_ID}&pn={encoded_name}&am={amount}&cu=INR&tr={tx_ref}"
             qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(upi_payload)}"
             
+            # Temporary transaction block store
             PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
             
             verify_pay_btn = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="🔄 Verify Payment Manually", callback_data=f"check_pay:{amount}")]
+                [InlineKeyboardButton(text="🔄 Verify Payment (Enter UTR)", callback_data=f"ask_utr:{amount}")]
             ])
             
             await update.message.reply_photo(
                 photo=qr_api_url,
-                caption=f"📲 **Scan QR to Pay ₹{amount:.2f}**\n\n🔹 **Merchant Account:** {MERCHANT_NAME}\n🔹 **Ref ID:** `{tx_ref}`\n\n⚠️ *Payment karne ke baad 5 seconds wait karein ya niche diye manual verification button par tap karein.*",
+                caption=f"📲 **Scan QR to Pay ₹{amount:.2f}**\n\n🔹 **Merchant Account:** {MERCHANT_NAME}\n🔹 **Ref ID:** `{tx_ref}`\n\n⚠️ *Payment karne ke baad niche diye button par tap karke apna 12-digit UTR/Ref ID enter karein verification ke liye.*",
                 reply_markup=verify_pay_btn,
                 parse_mode="Markdown"
             )
-            
-            context.job_queue.run_once(auto_verification_callback_job, 5, chat_id=update.message.chat_id, user_id=user_id)
             return
             
         except ValueError:
             await update.message.reply_text("❌ Invalid amount! Please enter a numeric value (e.g., 50):")
             return
 
+    # 2. State: Awaiting 12-Digit Real UTR Code Input
+    elif USER_STATES.get(user_id) == "AWAITING_UTR":
+        # Check if it's a valid 12-digit number sequence
+        if not re.match(r"^\d{12}$", user_text.strip()):
+            await update.message.reply_text("❌ **Invalid UTR!**\n\nKripya ek valid **12-digit numeric Ref No / UTR** enter karein jo payment receipt par hota hai:")
+            return
+        
+        utr_code = user_text.strip()
+        
+        # Double Spend Security Gate Check
+        if utr_code in USED_UTRS:
+            USER_STATES[user_id] = None
+            await update.message.reply_text("❌ **Verification Failed!**\n\nThis UTR has already been used for a deposit earlier.", reply_markup=load_dashboard_menu())
+            return
+            
+        tx_data = PENDING_TX.pop(user_id, None)
+        USER_STATES[user_id] = None  # Reset state lock completely
+        
+        if tx_data:
+            amount = tx_data["amount"]
+            USED_UTRS.add(utr_code)  # Lock the UTR permanently
+            USER_BALANCES[user_id] = USER_BALANCES.get(user_id, 0.0) + amount
+            
+            success_txt = f"🎉 **Payment Successfully Verified (Manual)!**\n"
+            success_txt += "────────────────────────\n"
+            success_txt += f"🆔 **User ID:** `{user_id}`\n"
+            success_txt += f"🔢 **UTR Registered:** `{utr_code}`\n"
+            success_txt += f"💰 **Added Funds:** +₹{amount:.2f}\n"
+            success_txt += f"💳 **Updated Wallet Balance:** **₹{USER_BALANCES[user_id]:.2f}**\n"
+            success_txt += "────────────────────────"
+            
+            await update.message.reply_text(success_txt, reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+        else:
+            await update.message.reply_text("❌ **Session Expired!** No active payment block context found.", reply_markup=load_dashboard_menu())
+        return
+
+    # --- BASE NAVIGATION COMMAND ROUTINGS ---
     if user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(text="💬 Open Support Bot", url="https://t.me/gbx_support_bot")]
@@ -165,54 +210,26 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
-# AUTO-DETECTION PROCESSING LAYER
-async def auto_verification_callback_job(context: ContextTypes.DEFAULT_TYPE):
-    job = context.job
-    user_id = job.user_id
-    chat_id = job.chat_id
-    
-    if user_id not in PENDING_TX: return
-    
-    tx_data = PENDING_TX.pop(user_id, None)
-    if tx_data:
-        amount = tx_data["amount"]
-        USER_BALANCES[user_id] = USER_BALANCES.get(user_id, 0.0) + amount
-        
-        success_txt = f"🎉 **Payment Successfully Verified (Auto)!**\n"
-        success_txt += "────────────────────────\n"
-        success_txt += f"🆔 **User ID:** `{user_id}`\n"
-        success_txt += f"💰 **Added Funds:** +₹{amount:.2f}\n"
-        success_txt += f"💳 **Updated Wallet Balance:** **₹{USER_BALANCES[user_id]:.2f}**\n"
-        success_txt += "────────────────────────"
-        
-        await context.bot.send_message(chat_id=chat_id, text=success_txt, reply_markup=load_dashboard_menu(), parse_mode="Markdown")
-
-# MANUAL INTERRUPT VERIFICATION ACTION BUTTON HANDLER
-async def manual_payment_verify_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# FIX ERROR 1: Trigger UTR collection prompt instead of auto-bypassing success
+async def prompt_utr_verification_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
-    data_payload = query.data.split(":")
-    amount = float(data_payload[1])
     
     if user_id in PENDING_TX:
-        PENDING_TX.pop(user_id, None)
-        USER_BALANCES[user_id] = USER_BALANCES.get(user_id, 0.0) + amount
+        USER_STATES[user_id] = "AWAITING_GRID" # Dynamic temporary holder state
+        USER_STATES[user_id] = "AWAITING_UTR"  # Lock user into UTR input path
         
-        # FIXED EFFECT: Instant removal of QR display interface message on success
+        # Original image containing QR gets instantly deleted to keep conversation structured
         await query.message.delete()
         
-        success_txt = f"🎉 **Payment Successfully Verified (Manual)!**\n"
-        success_txt += "────────────────────────\n"
-        success_txt += f"🆔 **User ID:** `{user_id}`\n"
-        success_txt += f"💰 **Added Funds:** +₹{amount:.2f}\n"
-        success_txt += f"💳 **Updated Wallet Balance:** **₹{USER_BALANCES[user_id]:.2f}**\n"
-        success_txt += "────────────────────────"
-        
-        await query.message.reply_text(success_txt, reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+        await query.message.reply_text(
+            "📝 **UTR Verification Input**\n\nKripya apne transaction receipt se **12-digit ka UPI Ref No / UTR Code** yahan message format me type karke send karein:",
+            parse_mode="Markdown"
+        )
     else:
-        await query.answer(text="ℹ️ Payment processed or no active request detected.", show_alert=True)
+        await query.answer(text="ℹ️ Session expired or payment block already verified.", show_alert=True)
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
@@ -280,7 +297,7 @@ async def init_webhook_mode():
     
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
-    bot_app.add_handler(CallbackQueryHandler(manual_payment_verify_handler, pattern="check_pay:.*"))
+    bot_app.add_handler(CallbackQueryHandler(prompt_utr_verification_handler, pattern="ask_utr:.*"))
     bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
     bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages))
     
@@ -300,4 +317,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-        
+            

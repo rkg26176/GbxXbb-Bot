@@ -203,8 +203,8 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         USER_STATES[user_id] = "AWAITING_AMOUNT"
         await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount (Min ₹10):", parse_mode="Markdown")
     elif user_text == "🛠️ Customer Care":
-        # Fixed underscore escaping here as well
-        await update.message.reply_text("Contact: @gbx\_support\_bot", parse_mode="Markdown")
+        # Safe link in HTML mode to maintain underscore structure
+        await update.message.reply_text("Contact: @gbx_support_bot")
     elif user_text == "📱 My Accounts":
         current_bal = get_balance(user_id)
         await update.message.reply_text(f"🆔 ID: `{user_id}`\n💰 Balance: `₹{current_bal:.2f}`", parse_mode="Markdown")
@@ -243,15 +243,17 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
-                # 🚨 FIXED: Underscores escaped with backslashes (\_) to render properly in Markdown
+                # 🚨 FIXED USING HTML MODE: Perfect line breaks, alignment, and full blue link parsing
                 rejection_text = (
-                    "⌛**payment Rejected!** Invalid or Wrong UTR ❌\n\n"
-                    "CONTACT ADMIN 👉 @gbx\_support\_bot 🙃"
+                    "⌛<b>Payment Rejected!</b>\n"
+                    "Invalid Or Wrong UTR ❌\n\n"
+                    "Please Contact Admin\n"
+                    "👉 @gbx_support_bot"
                 )
                 await bot_app.bot.send_message(
                     chat_id=target_user, 
                     text=rejection_text,
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
             except: pass
 
@@ -312,4 +314,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-        
+    

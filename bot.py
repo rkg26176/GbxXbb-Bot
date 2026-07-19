@@ -2,7 +2,7 @@ import os
 import logging
 import random
 import re
-import requests
+import psycopg2
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
@@ -11,59 +11,88 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- SUPABASE HTTP DIRECT ENGINE ---
-SUPABASE_URL = "https://zurfsqxesuoptiaumadh.supabase.co"
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe")
+# --- MASTER SUPABASE NATIVE POOLER CONNECTION ---
+DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=representation"
-}
+def get_db_connection():
+    conn = psycopg2.connect(DB_URI)
+    conn.autocommit = True
+    return conn
+
+def init_db():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                balance REAL DEFAULT 0.0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS used_utrs (
+                utr TEXT PRIMARY KEY
+            )
+        ''')
+        cursor.close()
+        conn.close()
+        logging.info("Supabase permanent tables initialized successfully.")
+    except Exception as e:
+        logging.error(f"Database initialization error: {e}")
 
 def get_balance(user_id: int) -> float:
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?user_id=eq.{user_id}&select=balance"
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            return float(data[0]['balance']) if (data and 'balance' in data[0]) else 0.0
-        return 0.0
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return float(row[0]) if row else 0.0
     except Exception as e:
-        logging.error(f"Balance check error: {e}")
+        logging.error(f"Error getting balance: {e}")
         return 0.0
 
 def update_balance(user_id: int, amount: float):
     try:
-        current = get_balance(user_id)
-        new_balance = current + amount
-        url = f"{SUPABASE_URL}/rest/v1/users"
-        payload = {"user_id": user_id, "balance": new_balance}
-        requests.post(url, headers={"Prefer": "resolution=merge-duplicates", **HEADERS}, json=payload, timeout=10)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO users (user_id, balance) VALUES(%s, %s)
+            ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
+        ''', (user_id, amount, amount))
+        cursor.close()
+        conn.close()
+        logging.info(f"Successfully updated balance for user {user_id} by {amount}")
     except Exception as e:
-        logging.error(f"Balance write error: {e}")
+        logging.error(f"Error updating balance: {e}")
 
 def is_utr_used(utr: str) -> bool:
     try:
-        url = f"{SUPABASE_URL}/rest/v1/used_utrs?utr=eq.{utr}&select=utr"
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            # Strict validation check: only return True if data actually contains the UTR list element
-            if isinstance(data, list) and len(data) > 0:
-                return True
-        return False
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM used_utrs WHERE utr = %s", (str(utr).strip(),))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row is not None
     except Exception as e:
-        logging.error(f"UTR check error: {e}")
+        logging.error(f"Error checking UTR: {e}")
         return False
 
 def add_used_utr(utr: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/used_utrs"
-        requests.post(url, headers=HEADERS, json={"utr": utr}, timeout=10)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (str(utr).strip(),))
+        cursor.close()
+        conn.close()
+        logging.info(f"UTR {utr} registered inside permanent block list.")
     except Exception as e:
-        logging.error(f"UTR write error: {e}")
+        logging.error(f"Error adding UTR: {e}")
+
+# Trigger database engine setup on deployment boot
+init_db()
 
 # --- SYSTEM SETTINGS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
@@ -210,7 +239,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
                 text=f"📥 **New Deposit Alert!**\n👤 User ID: `{user_id}`\n💰 Amount: ₹{amount}\n🔢 UTR: `{utr}`",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("✅ Accept", callback_data=f"adm_accept:{user_id}:{amount}:{utr}"),
-                    InlineKeyboardButton("❌ Reject", callback_data=f"adm_reject:{user_id}")
+                    InlineKeyboardButton("❌ Reject", callback_data=f"adm_reject:{user_id}:{utr}")
                 ]]),
                 parse_mode="Markdown"
             )
@@ -231,30 +260,36 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
+# --- ACTION LOGIC FOR CHECKER BOT BUTTONS ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
     await query.answer()
     data = query.data.split(":")
     action, target_user = data[0], int(data[1])
+    utr = data[3] if len(data) > 3 else "N/A"
     
     if action == "adm_accept":
-        amount, utr = float(data[2]), data[3]
+        amount = float(data[2])
         if is_utr_used(utr):
-            await query.message.edit_text("❌ Already processed.")
+            await query.message.edit_text(f"❌ Already processed for User `{target_user}`.")
             return
+            
         add_used_utr(utr)  
         update_balance(target_user, amount) 
         PENDING_TX.pop(target_user, None)
         
-        new_total = get_balance(target_user)
-        await query.message.edit_text(f"✅ Approved! ₹{amount} added.")
+        # User ID fixed inside checker confirmation log
+        await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
         if bot_app:
-            try: await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
+            try: 
+                new_total = get_balance(target_user)
+                await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
             except: pass
     else:
         PENDING_TX.pop(target_user, None)
-        await query.message.edit_text(f"❌ Rejected request.")
+        # User ID fixed inside checker rejection log
+        await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
                 rejection_text = "⌛<b>Payment Rejected!</b>\nInvalid Or Wrong UTR ❌\n\nPlease Contact Admin\n👉 @gbx_support_bot"
@@ -330,3 +365,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+    

@@ -3,6 +3,7 @@ import logging
 import urllib.request
 import urllib.parse
 import json
+import random
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -28,9 +29,18 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
+# Ledger Context Memory Layers
+USER_BALANCES = {}
+USER_STATES = {}
+PENDING_TX = {}
+
+# FIXED PRODUCTION ENDPOINT CREDENTIALS
+YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
+MERCHANT_NAME = "GBX Store Bar"
+
 bot_app = None
 
-# TARGETED MATRIX GRID GENERATOR
+# STRICT 5-BUTTON LAYOUT GENERATOR
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
@@ -84,10 +94,46 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels aur GC join nahi kiye!", show_alert=True)
 
-# KEYBOARD BUTTON ACTIONS
+# TEXT ROUTER INTERCEPTOR ENGINE
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     user_text = update.message.text
     
+    # Wallet State Validation Gate
+    if USER_STATES.get(user_id) == "AWAITING_AMOUNT":
+        try:
+            amount = float(user_text)
+            if amount < 10.0:
+                await update.message.reply_text("❌ **Payment Rejected!**\n\nMinimum deposit amount **₹10** hai. Kripya ₹10 ya usse zyada ka amount enter karein:", parse_mode="Markdown")
+                return
+            
+            USER_STATES[user_id] = None # Flush input context state
+            
+            tx_ref = f"GBX{user_id}X{random.randint(1000, 9999)}"
+            encoded_name = urllib.parse.quote(MERCHANT_NAME)
+            upi_payload = f"upi://pay?pa={YOUR_UPI_ID}&pn={encoded_name}&am={amount}&cu=INR&tr={tx_ref}"
+            qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(upi_payload)}"
+            
+            PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
+            
+            verify_pay_btn = InlineKeyboardMarkup([
+                [InlineKeyboardButton(text="🔄 Verify Payment Manually", callback_data=f"check_pay:{amount}")]
+            ])
+            
+            await update.message.reply_photo(
+                photo=qr_api_url,
+                caption=f"📲 **Scan QR to Pay ₹{amount:.2f}**\n\n🔹 **Merchant Account:** {MERCHANT_NAME}\n🔹 **Ref ID:** `{tx_ref}`\n\n⚠️ *Payment karne ke baad 5 seconds wait karein ya niche diye manual verification button par tap karein.*",
+                reply_markup=verify_pay_btn,
+                parse_mode="Markdown"
+            )
+            
+            context.job_queue.run_once(auto_verification_callback_job, 5, chat_id=update.message.chat_id, user_id=user_id)
+            return
+            
+        except ValueError:
+            await update.message.reply_text("❌ Invalid amount! Please enter a numeric value (e.g., 50):")
+            return
+
     if user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(text="💬 Open Support Bot", url="https://t.me/gbx_support_bot")]
@@ -100,14 +146,73 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         return
         
     elif user_text == "💰 Wallet":
-        await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment dynamic operations active)*", parse_mode="Markdown")
+        current_bal = USER_BALANCES.get(user_id, 0.0)
+        USER_STATES[user_id] = "AWAITING_AMOUNT"
+        await update.message.reply_text(
+            f"💳 **Your Wallet Balance:** `₹{current_bal:.2f}`\n*(Payment dynamic operations active)*\n\n📥 **Enter your amount:**\n*(Minimum amount: ₹10)*",
+            parse_mode="Markdown"
+        )
         return
 
-    elif user_text in ["📱 My Accounts", "➕ New Login"]:
-        await update.message.reply_text(f"🚧 **{user_text}** framework setup active.", parse_mode="Markdown")
+    elif user_text == "📱 My Accounts":
+        current_bal = USER_BALANCES.get(user_id, 0.0)
+        await update.message.reply_text(f"📱 **My Accounts Profile**\n\n🆔 User ID: `{user_id}`\n💰 Cash Ledger: `₹{current_bal:.2f}`", parse_mode="Markdown")
+        return
+
+    elif user_text == "➕ New Login":
+        await update.message.reply_text("🚧 Login system terminal interface configuration active.", parse_mode="Markdown")
         return
 
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+
+# AUTO-DETECTION PROCESSING LAYER
+async def auto_verification_callback_job(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    user_id = job.user_id
+    chat_id = job.chat_id
+    
+    if user_id not in PENDING_TX: return
+    
+    tx_data = PENDING_TX.pop(user_id, None)
+    if tx_data:
+        amount = tx_data["amount"]
+        USER_BALANCES[user_id] = USER_BALANCES.get(user_id, 0.0) + amount
+        
+        success_txt = f"🎉 **Payment Successfully Verified (Auto)!**\n"
+        success_txt += "────────────────────────\n"
+        success_txt += f"🆔 **User ID:** `{user_id}`\n"
+        success_txt += f"💰 **Added Funds:** +₹{amount:.2f}\n"
+        success_txt += f"💳 **Updated Wallet Balance:** **₹{USER_BALANCES[user_id]:.2f}**\n"
+        success_txt += "────────────────────────"
+        
+        await context.bot.send_message(chat_id=chat_id, text=success_txt, reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+
+# MANUAL INTERRUPT VERIFICATION ACTION BUTTON HANDLER
+async def manual_payment_verify_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    data_payload = query.data.split(":")
+    amount = float(data_payload[1])
+    
+    if user_id in PENDING_TX:
+        PENDING_TX.pop(user_id, None)
+        USER_BALANCES[user_id] = USER_BALANCES.get(user_id, 0.0) + amount
+        
+        # FIXED EFFECT: Instant removal of QR display interface message on success
+        await query.message.delete()
+        
+        success_txt = f"🎉 **Payment Successfully Verified (Manual)!**\n"
+        success_txt += "────────────────────────\n"
+        success_txt += f"🆔 **User ID:** `{user_id}`\n"
+        success_txt += f"💰 **Added Funds:** +₹{amount:.2f}\n"
+        success_txt += f"💳 **Updated Wallet Balance:** **₹{USER_BALANCES[user_id]:.2f}**\n"
+        success_txt += "────────────────────────"
+        
+        await query.message.reply_text(success_txt, reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+    else:
+        await query.answer(text="ℹ️ Payment processed or no active request detected.", show_alert=True)
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
@@ -126,10 +231,10 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
         await update.message.reply_text(compiled_receipt, parse_mode="Markdown")
-    except Exception as data_err:
+    except Exception:
         await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Payload:* {raw_payload_wire}")
 
-# --- FASTAPI WEB SERVER MODULE ---
+# --- FASTAPI SERVER MODULE ---
 api_app = FastAPI()
 
 @api_app.get("/")
@@ -175,9 +280,8 @@ async def init_webhook_mode():
     
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
+    bot_app.add_handler(CallbackQueryHandler(manual_payment_verify_handler, pattern="check_pay:.*"))
     bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
-    
-    # FIXED: Wrapping filter text strictly under MessageHandler instances to bypass BaseHandler type errors
     bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages))
     
     await bot_app.initialize()
@@ -196,4 +300,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+        

@@ -36,7 +36,7 @@ CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 USER_BALANCES = {}
 USER_STATES = {}
 PENDING_TX = {}
-USED_UTRS = set()
+USED_UTRS = set()  # Global set to instantly block duplicate fraud entries
 
 YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
 MERCHANT_NAME = "GBX"
@@ -116,9 +116,12 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         if not re.match(r"^\d{12}$", user_text.strip()):
             await update.message.reply_text("❌ 12-digit UTR daalein.")
             return
+            
         utr = user_text.strip()
+        
+        # 🚨 STRICT INSTANT GATE BLOCKER FOR USED UTRS
         if utr in USED_UTRS:
-            await update.message.reply_text("❌ UTR already used.")
+            await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
             return
             
         tx_data = PENDING_TX.get(user_id)
@@ -126,7 +129,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             amount = tx_data["amount"]
             USER_STATES[user_id] = None
             
-            # 🚨 ALERTS VIA CHECKER BOT TO YOUR PERSONAL ID
+            # 🚨 INSTANT ALERTS VIA CHECKER BOT TO YOUR PERSONAL CHAT
             await checker_app.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"📥 **New Deposit Alert!**\n👤 User ID: `{user_id}`\n💰 Amount: ₹{amount}\n🔢 UTR: `{utr}`",
@@ -168,7 +171,7 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             await query.message.edit_text("❌ Already processed.")
             return
             
-        USED_UTRS.add(utr)
+        USED_UTRS.add(utr)  # Permanently log the UTR to prevent dual-processing
         PENDING_TX.pop(target_user, None)
         USER_BALANCES[target_user] = USER_BALANCES.get(target_user, 0.0) + amount
         
@@ -205,7 +208,7 @@ async def init_webhook_mode():
     URL = os.getenv("RENDER_EXTERNAL_URL")
     if not TOKEN or not URL: return
 
-    # 1. Main Bot Initialization
+    # 1. Main Bot Routing Initialize
     bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
@@ -216,7 +219,7 @@ async def init_webhook_mode():
     await bot_app.start()
     await bot_app.bot.set_webhook(url=f"{URL}/webhook")
 
-    # 2. Checker Bot Initialization (Webhooks mapped via sub-routes)
+    # 2. Checker Bot Hook (Directly maps internal node responses)
     checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
     
@@ -244,4 +247,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-            
+    

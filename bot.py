@@ -112,7 +112,7 @@ TARGET_LABELS = {
 ADMIN_CHAT_ID = 8254886110
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
-# In-Memory Volatile States (Safe to lose on restart)
+# In-Memory Volatile States
 USER_STATES = {}
 PENDING_TX = {}
 
@@ -129,22 +129,38 @@ def load_dashboard_menu():
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
     ], resize_keyboard=True)
 
-async def verify_user_membership(user_id: int) -> bool:
+# Helper function to get remaining channels for a user
+async def get_remaining_channels(user_id: int):
     global bot_app
-    if not bot_app: return False
+    remaining = []
+    if not bot_app: 
+        return REQUIRED_TARGETS
     for target in REQUIRED_TARGETS:
         try:
             member = await bot_app.bot.get_chat_member(chat_id=target, user_id=user_id)
-            if member.status in ['left', 'kicked']: return False
-        except TelegramError: return False
-    return True
+            if member.status in ['left', 'kicked']:
+                remaining.append(target)
+        except TelegramError:
+            remaining.append(target)
+    return remaining
+
+async def verify_user_membership(user_id: int) -> bool:
+    remaining = await get_remaining_channels(user_id)
+    return len(remaining) == 0
 
 async def show_force_join_menu(update: Update):
+    user_id = update.effective_user.id
+    remaining = await get_remaining_channels(user_id)
+    
     buttons = []
-    for target in REQUIRED_TARGETS:
+    for target in remaining:
         buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
     buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-    await update.message.reply_text("⚠️ **Access Denied!**\nJoin channels to use bot.", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    
+    total_left = len(remaining)
+    text = f"⚠️ **Access Denied!**\n\nAbhi bhi `{total_left}` channels join karna baki hai. Niche diye gaye channels ko join karein:"
+    
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verify_user_membership(update.effective_user.id):
@@ -152,20 +168,53 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
+# --- DYNAMIC EDIT BUTTONS HANDLER ---
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
     await query.answer()
-    if await verify_user_membership(query.from_user.id):
-        await query.message.delete()
+    
+    remaining = await get_remaining_channels(user_id)
+    total_left = len(remaining)
+    
+    if total_left == 0:
+        # User has joined everything! Delete force join menu and give dashboard
+        try:
+            await query.message.delete()
+        except:
+            pass
         await query.message.reply_text("✅ **Access Granted! Welcome.**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
     else:
-        await query.answer(text="❌ Saare channels aur GC join nahi kiye!", show_alert=True)
+        # Dynamic update: rebuild buttons using ONLY channels still missing
+        buttons = []
+        for target in remaining:
+            buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
+        buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
+        
+        text = f"⚠️ **Access Denied!**\n\nKripya baki bache `{total_left}` channels bhi join karein:"
+        
+        try:
+            # Edits the existing message inline, removing joined channel buttons
+            await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+        except TelegramError:
+            # Fallback alert if user clicks verify without doing anything new
+            await query.answer(text=f"❌ Baki ke {total_left} channels abhi baki hain!", show_alert=True)
 
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global checker_app
     user_id = update.effective_user.id
     user_text = update.message.text
     
+    # Check force join on text actions too
+    if not await verify_user_membership(user_id):
+        remaining = await get_remaining_channels(user_id)
+        buttons = []
+        for target in remaining:
+            buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
+        buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
+        await update.message.reply_text(f"⚠️ **Access Denied!**\nBache hue `{len(remaining)}` channels join karein.", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+        return
+
     if user_text in ["📱 My Accounts", "➕ New Login", "💰 Wallet", "🛠️ Customer Care"]:
         USER_STATES[user_id] = None
 
@@ -332,4 +381,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-        
+            

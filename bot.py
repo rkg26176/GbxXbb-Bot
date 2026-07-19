@@ -36,7 +36,7 @@ CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 USER_BALANCES = {}
 USER_STATES = {}
 PENDING_TX = {}
-USED_UTRS = set()  # Global set to instantly block duplicate fraud entries
+USED_UTRS = set()  
 
 YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
 MERCHANT_NAME = "GBX"
@@ -119,7 +119,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             
         utr = user_text.strip()
         
-        # 🚨 STRICT INSTANT GATE BLOCKER FOR USED UTRS
         if utr in USED_UTRS:
             await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
             return
@@ -129,7 +128,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             amount = tx_data["amount"]
             USER_STATES[user_id] = None
             
-            # 🚨 INSTANT ALERTS VIA CHECKER BOT TO YOUR PERSONAL CHAT
             await checker_app.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"📥 **New Deposit Alert!**\n👤 User ID: `{user_id}`\n💰 Amount: ₹{amount}\n🔢 UTR: `{utr}`",
@@ -171,7 +169,7 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             await query.message.edit_text("❌ Already processed.")
             return
             
-        USED_UTRS.add(utr)  # Permanently log the UTR to prevent dual-processing
+        USED_UTRS.add(utr)  
         PENDING_TX.pop(target_user, None)
         USER_BALANCES[target_user] = USER_BALANCES.get(target_user, 0.0) + amount
         
@@ -185,7 +183,12 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
-                await bot_app.bot.send_message(target_user, "❌ **Payment Rejected!** UTR invalid ya details galat hain.")
+                # 🚨 UPDATED CUSTOM REJECTION TEXT FOR USER
+                await bot_app.bot.send_message(
+                    chat_id=target_user, 
+                    text="**payment Rejected!** Invalid or Wrong Utr\nContact admin 👉 @gbx_support_bot",
+                    parse_mode="Markdown"
+                )
             except: pass
 
 async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -208,7 +211,6 @@ async def init_webhook_mode():
     URL = os.getenv("RENDER_EXTERNAL_URL")
     if not TOKEN or not URL: return
 
-    # 1. Main Bot Routing Initialize
     bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
@@ -219,7 +221,6 @@ async def init_webhook_mode():
     await bot_app.start()
     await bot_app.bot.set_webhook(url=f"{URL}/webhook")
 
-    # 2. Checker Bot Hook (Directly maps internal node responses)
     checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
     

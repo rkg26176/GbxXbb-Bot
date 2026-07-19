@@ -17,7 +17,7 @@
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
         body { margin: 0; padding: 0; background-color: var(--bb-light-bg); color: #333; overflow-x: hidden; padding-bottom: 120px; }
         
-        /* Real BigBasket Header Styling */
+        /* Premium Header Shell */
         .bb-sticky-header { position: sticky; top: 0; background: #c5e1a5; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
         .delivery-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px 16px; }
         .eta-badge { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 4px; color: var(--bb-dark); margin-bottom: 4px; }
@@ -25,7 +25,7 @@
         .location-dropdown-container { display: flex; align-items: center; gap: 6px; cursor: pointer; max-width: 80%; }
         .location-icon { font-size: 16px; color: #000; }
         .location-text-node { font-size: 14px; font-weight: 700; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .arrow-down-icon { font-size: 12px; color: #333; transition: transform 0.2s; }
+        .arrow-down-icon { font-size: 12px; color: #333; }
 
         .profile-btn { width: 36px; height: 36px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--bb-dark-green); font-weight: 800; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
@@ -67,69 +67,61 @@
         .bb-ui-qty-box { display: none; width: 100%; height: 100%; background: var(--bb-green); color: white; border-radius: 6px; justify-content: space-between; align-items: center; }
         .bb-qty-btn { background: transparent; border: none; color: white; width: 22px; height: 100%; font-weight: bold; cursor: pointer; }
 
-        /* Dynamic Popup Sheets Base Layer (Bottom Sheets) */
+        /* Bottom Sheets Base Layout */
         .popup-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; }
         .bottom-sheet { position: fixed; bottom: -100%; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; z-index: 100000; transition: bottom 0.3s ease-out; max-height: 85vh; overflow-y: auto; }
         .bottom-sheet.active { bottom: 0; }
         
         .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .sheet-title { font-size: 16px; font-weight: 800; color: #000; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sheet-title { font-size: 16px; font-weight: 800; color: #000; text-transform: uppercase; }
         .sheet-close { font-size: 20px; color: #666; cursor: pointer; font-weight: bold; }
 
-        /* Search input inside location panel */
         .sheet-search-box { background: #f5f6f7; border: 1px solid #e2e3e4; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; margin-bottom: 16px; }
         .sheet-input-field { width: 100%; border: none; background: transparent; padding: 12px 0; font-size: 14px; outline: none; }
 
-        /* Use Current Location Action Pill */
-        .current-loc-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #d4ebd2; background: white; color: var(--bb-dark-green); padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 20px; }
+        .current-loc-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #d4ebd2; background: white; color: var(--bb-dark-green); padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; width: 100%; }
+        .section-label { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; margin-bottom: 12px; }
         
-        .section-label { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
-        
-        /* Saved Addresses Display Layout */
         .saved-addr-card { background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 12px; padding: 14px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
         .addr-badge { background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
         .addr-title-txt { font-size: 15px; font-weight: 800; color: #111; }
         .addr-desc-txt { font-size: 13px; color: #555; margin-top: 4px; line-height: 1.4; }
 
-        /* Edit Address Fields Structure */
         .form-row-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
         .input-group { display: flex; flex-direction: column; margin-bottom: 14px; }
         .input-group label { font-size: 12px; font-weight: 700; color: #666; margin-bottom: 6px; }
         .form-control-input { background: white; border: 1px solid #d2d4d6; border-radius: 8px; padding: 12px; font-size: 14px; outline: none; color: #222; }
-        .form-control-input:focus { border-color: var(--bb-green); }
 
         .save-as-row { display: flex; gap: 10px; margin-bottom: 16px; }
-        .type-pill { border: 1px solid #d2d4d6; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; background: white; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .type-pill { border: 1px solid #d2d4d6; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; background: white; cursor: pointer; }
         .type-pill.active { border-color: var(--bb-dark-green); background: #e8f5e9; color: var(--bb-dark-green); }
 
-        .action-submit-btn { background: var(--bb-dark-green); color: white; border: none; width: 100%; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
-        .coordinate-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d93838; font-weight: 700; margin-left: auto; }
+        .action-submit-btn { background: var(--bb-dark-green); color: white; border: none; width: 100%; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; text-transform: uppercase; }
+        .coordinate-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4e820d; font-weight: 700; margin-left: auto; }
 
-        /* Bottom Checkout Layer Strip */
+        /* Bottom Widgets */
         .bottom-widgets-layer { position: fixed; bottom: 65px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px; pointer-events: none; z-index: 99999; }
-        .app-checkout-pill { background: var(--bb-dark-green); color: white; width: 100%; border-radius: 30px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; box-shadow: 0 4px 25px rgba(12,62,25,0.3); }
+        .app-checkout-pill { background: var(--bb-dark-green); color: white; width: 100%; border-radius: 30px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
         .checkout-pill-bill { font-size: 16px; font-weight: 800; }
         .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 0; z-index: 99999; }
         .nav-tab-node { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: #888; }
         .nav-tab-node.active { color: var(--bb-green); }
-        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; font-size: 13px; }
+        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; }
         
-        /* Auto location dropdown items container */
         .search-results-tray { display: none; background: white; border: 1px solid #e2e3e4; border-radius: 10px; max-height: 200px; overflow-y: auto; margin-bottom: 16px; }
         .tray-item { padding: 12px; border-bottom: 1px solid #f5f6f7; font-size: 13px; cursor: pointer; font-weight: 600; color: #444; }
-        .tray-item:last-child { border: none; }
     </style>
 </head>
 <body>
 
-    <!-- Header Frame Shell -->
+    <!-- Header -->
     <div class="bb-sticky-header" id="header-shell">
         <div class="delivery-row">
             <div class="location-dropdown-container" onclick="openLocationPanel()">
                 <span class="location-icon">📍</span>
                 <div>
                     <div class="eta-badge">⚡ 5 mins</div>
-                    <div class="location-text-node" id="top-loc-string">Home - call me 9431327448...</div>
+                    <div class="location-text-node" id="top-loc-string">Locating current address...</div>
                 </div>
                 <span class="arrow-down-icon">∨</span>
             </div>
@@ -158,7 +150,7 @@
         </div>
     </div>
 
-    <!-- MAIN HOME CATALOG VIEW -->
+    <!-- MAIN VIEWS -->
     <div id="view-home">
         <div class="promo-banner-space">
             <img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="banner">
@@ -169,7 +161,7 @@
         <div class="product-grid-container" id="catalog-grid-root"></div>
     </div>
 
-    <!-- POPUP SHEET 1: SELECT DELIVERY LOCATION -->
+    <!-- POPUP 1: SELECT LOCATION -->
     <div class="popup-overlay" id="overlay-select-loc" onclick="closeAllSheets()"></div>
     <div class="bottom-sheet" id="sheet-select-loc">
         <div class="sheet-header">
@@ -182,7 +174,6 @@
             <input type="text" class="sheet-input-field" id="loc-search-input" placeholder="Search for your location" oninput="handleManualSearchRouting(this.value)">
         </div>
 
-        <!-- Suggestions list tray -->
         <div class="search-results-tray" id="tray-suggestions"></div>
 
         <button class="current-loc-btn" onclick="triggerNativeGPS()">
@@ -190,18 +181,18 @@
         </button>
 
         <div class="section-label">Saved Addresses</div>
-        <div class="saved-addr-card" onclick="openEditAddressPanel('Home', 'call me 9431327448', 'CCL Colony, Pahartoli', '843005', '9771208817')">
+        <div class="saved-addr-card" onclick="openEditAddressPanel()">
             <div class="addr-badge">📍</div>
             <div>
-                <div class="addr-title-txt">Home <span style="background:#e8f5e9; color:var(--bb-dark-green); font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px;">SELECTED</span></div>
-                <div class="addr-desc-txt" id="saved-card-desc-render">call me 9431327448, CCL Colony, Pahartoli, 834005</div>
+                <div class="addr-title-txt"><span id="saved-card-type">Home</span> <span style="background:#e8f5e9; color:var(--bb-dark-green); font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px;">SELECTED</span></div>
+                <div class="addr-desc-txt" id="saved-card-desc-render">Syncing network coordinates...</div>
             </div>
         </div>
         
-        <button class="action-submit-btn" style="margin-top:20px; background:#f5f6f7; color:#333; border:1px solid #d2d4d6;" onclick="openEditAddressPanel('Home', '', '', '', '')">+ Add New Address</button>
+        <button class="action-submit-btn" style="margin-top:20px; background:#f5f6f7; color:#333; border:1px solid #d2d4d6;" onclick="openEditAddressPanel(true)">+ Add New Address</button>
     </div>
 
-    <!-- POPUP SHEET 2: EDIT ADDRESS -->
+    <!-- POPUP 2: EDIT ADDRESS -->
     <div class="popup-overlay" id="overlay-edit-addr" onclick="closeEditAddressSheet()"></div>
     <div class="bottom-sheet" id="sheet-edit-addr">
         <div class="sheet-header">
@@ -211,12 +202,12 @@
 
         <div class="sheet-search-box">
             <span style="margin-right:8px; color:#888;">🔍</span>
-            <input type="text" class="sheet-input-field" id="form-search-landmark" placeholder="Search for area, street, society...">
+            <input type="text" class="sheet-input-field" placeholder="Search for area, street, society..." oninput="handleManualSearchRouting(this.value)">
         </div>
 
         <button class="current-loc-btn" style="padding:10px; font-size:14px; margin-bottom:14px;" onclick="triggerNativeGPS()">
             <span>🎯</span> Use my location 
-            <span class="coordinate-indicator" id="geo-coord-display">📍 Location set: 23.38528, 85.28606</span>
+            <span class="coordinate-indicator" id="geo-coord-display">Locating GPS...</span>
         </button>
 
         <div class="section-label" style="margin-bottom:8px;">Save as</div>
@@ -228,34 +219,34 @@
 
         <div class="input-group">
             <label>House / Flat no.</label>
-            <input type="text" class="form-control-input" id="input-house" placeholder="e.g. call me 9431327448">
+            <input type="text" class="form-control-input" id="input-house" placeholder="House no / Details">
         </div>
 
         <div class="input-group">
             <label>Area / Society</label>
-            <input type="text" class="form-control-input" id="input-area" placeholder="e.g. CCL Colony, Pahartoli">
+            <input type="text" class="form-control-input" id="input-area" placeholder="Area Name">
         </div>
 
         <div class="input-group">
             <label>Landmark (optional)</label>
-            <input type="text" class="form-control-input" id="input-landmark" placeholder="e.g. Near Water Tank">
+            <input type="text" class="form-control-input" id="input-landmark" placeholder="Near landmark">
         </div>
 
         <div class="form-row-grid">
             <div class="input-group">
                 <label>PIN code</label>
-                <input type="text" class="form-control-input" id="input-pincode" placeholder="834005">
+                <input type="text" class="form-control-input" id="input-pincode" placeholder="Pincode">
             </div>
             <div class="input-group">
                 <label>Contact number</label>
-                <input type="text" class="form-control-input" id="input-phone" placeholder="9771208817">
+                <input type="text" class="form-control-input" id="input-phone" placeholder="Phone number">
             </div>
         </div>
 
         <button class="action-submit-btn" onclick="saveAddressFormData()">Update address</button>
     </div>
 
-    <!-- Floating checkout view layer -->
+    <!-- Checkout Widget -->
     <div class="bottom-widgets-layer" id="checkout-sheet-widget" style="display: none;">
         <div class="app-checkout-pill" onclick="processFinalCheckout()">
             <div>
@@ -266,7 +257,7 @@
         </div>
     </div>
 
-    <!-- Absolute Navbar Shell Strip Nav -->
+    <!-- Bottom Navbar -->
     <div class="app-bottom-navbar">
         <div class="nav-tab-node active"><span style="font-size:18px;">🏠</span><div style="font-size:10px; font-weight:700;">Home</div></div>
         <div class="nav-tab-node"><span style="font-size:18px;">🗂️</span><div style="font-size:10px; font-weight:700;">Categories</div></div>
@@ -282,28 +273,40 @@
         let localizedBillSum = 0;
         let selectedAddressType = "Home";
         
-        // Structured variables matching your layout screenshots
         let currentCapturedLocation = {
             type: "Home",
-            house: "call me 9431327448",
-            area: "CCL Colony, Pahartoli",
+            house: "",
+            area: "Detecting location...",
             landmark: "",
-            pincode: "834005",
-            phone: "9771208817",
-            coords: "23.38528, 85.28606"
+            pincode: "",
+            phone: "",
+            coords: "0.0, 0.0"
         };
 
-        // Initialize state fields
         function updateTopBarStringDisplay() {
-            const displayString = `${currentCapturedLocation.type} - ${currentCapturedLocation.house}, ${currentCapturedLocation.area}...`;
-            document.getElementById('top-loc-string').innerText = displayString;
+            let displayString = "";
+            if(currentCapturedLocation.house) {
+                displayString = `${currentCapturedLocation.type} - ${currentCapturedLocation.house}, ${currentCapturedLocation.area}`;
+            } else {
+                displayString = `${currentCapturedLocation.area}`;
+            }
+            document.getElementById('top-loc-string').innerText = displayString.length > 30 ? displayString.substring(0, 28) + "..." : displayString;
+            document.getElementById('saved-card-type').innerText = currentCapturedLocation.type;
+            document.getElementById('saved-card-desc-render').innerText = `${currentCapturedLocation.house ? currentCapturedLocation.house + ', ' : ''}${currentCapturedLocation.area}`;
         }
 
         function openLocationPanel() {
             document.getElementById('overlay-select-loc').style.display = 'block';
-            setTimeout(() => {
-                document.getElementById('sheet-select-loc').classList.add('active');
-            }, 50);
+            setTimeout(() => { document.getElementById('sheet-select-loc').classList.add('active'); }, 50);
         }
 
-        func
+        function closeAllSheets() {
+            document.getElementById('sheet-select-loc').classList.remove('active');
+            setTimeout(() => { document.getElementById('overlay-select-loc').style.display = 'none'; }, 300);
+        }
+
+        function openEditAddressPanel(clearFields = false) {
+            document.getElementById('sheet-select-loc').classList.remove('active');
+            document.getElementById('overlay-select-loc').style.display = 'none';
+
+            setAddressType(clearFiel

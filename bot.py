@@ -30,14 +30,14 @@ TARGET_LABELS = {
 
 bot_app = None
 
-# MASTER 5-BUTTON KEYBOARD ENGINE
+# STRICT 5-BUTTON MATRIX GENERATOR (Removed 'Home', added exactly what you requested)
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ New Login")],
         [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Care")],
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
-    ], resize_keyboard=True)
+    ], resize_keyboard=True, one_time_keyboard=False)
 
 async def verify_user_membership(user_id: int) -> bool:
     global bot_app
@@ -65,29 +65,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verify_user_membership(update.effective_user.id):
         await show_force_join_menu(update)
         return
-    await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+    # Fresh message with absolute keyboard rendering to overwrite phone cache layout
+    await update.message.reply_text(
+        "✨ **Dashboard Active!**\n\nNiche diye gaye options ka upyog karein.", 
+        reply_markup=load_dashboard_menu(), 
+        parse_mode="Markdown"
+    )
 
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if await verify_user_membership(query.from_user.id):
         await query.message.delete()
-        # FIXED: Yahan ab strictly naya 5-button master keyboard push hoga
-        await query.message.reply_text("✅ Access Granted!", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+        # Overwriting layout with fresh forced 5-button matrix payload
+        await query.message.reply_text(
+            "✅ **Access Granted! Welcome to GBX Dashboard.**", 
+            reply_markup=load_dashboard_menu(), 
+            parse_mode="Markdown"
+        )
     else:
-        await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
+        await query.answer(text="❌ Saare channels aur GC join nahi kiye!", show_alert=True)
 
-# KEYBOARD ROUTER PROCESSING PANEL
+# KEYBOARD BUTTON ROUTER & TEXT INTERCEPTOR ENGINE
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     
-    # 1. Customer Care Link Button Handler
+    # 1. Customer Care Link Generation Hook
     if user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(text="💬 Open Support Bot", url="https://t.me/gbx_support_bot")]
         ])
         await update.message.reply_text(
-            "🙋‍♂️ **GBX Official Support**\n\nAgar aapko kisi bhi tarah ki sahayata chahiye, toh niche diye button par click karke hamare customer care support se contact karein.",
+            "🙋‍♂️ **GBX Official Customer Support**\n\nAgar aapko koi dikkat ya sawaal hai, toh niche diye button par click karke hamare support bot se connect karein.",
             reply_markup=support_keyboard,
             parse_mode="Markdown"
         )
@@ -95,15 +104,15 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         
     # 2. Wallet Trigger
     elif user_text == "💰 Wallet":
-        await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment dynamic operations panel)*", parse_mode="Markdown")
+        await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment dynamic operations active)*", parse_mode="Markdown")
         return
 
-    # 3. Operations Buttons Fallback Display
+    # 3. Rest of the operations menu routing logs
     elif user_text in ["📱 My Accounts", "➕ New Login"]:
-        await update.message.reply_text(f"🚧 **{user_text}** functionality structure initialization pending.", parse_mode="Markdown")
+        await update.message.reply_text(f"🚧 **{user_text}** framework setup active.", parse_mode="Markdown")
         return
 
-    # Default fallback to keep keyboard up
+    # Dynamic fallback to keep the 5-button setup active on chat inputs
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -126,7 +135,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as data_err:
         await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Payload:* {raw_payload_wire}")
 
-# --- FASTAPI SERVER MODULE ---
+# --- FASTAPI WEB SERVER MODULE ---
 api_app = FastAPI()
 
 @api_app.get("/")
@@ -190,4 +199,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    

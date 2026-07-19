@@ -5,6 +5,7 @@ import urllib.parse
 import json
 import random
 import re
+import sqlite3
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -12,6 +13,67 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# --- DATABASE LAYER (PERMANENT STORAGE) ---
+DB_FILE = "gbx_database.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    # Users Balance Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            balance REAL DEFAULT 0.0
+        )
+    ''')
+    # Used UTRs Table to prevent duplicates forever
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS used_utrs (
+            utr TEXT PRIMARY KEY
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def get_balance(user_id: int) -> float:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else 0.0
+
+def update_balance(user_id: int, amount: float):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO users (user_id, balance) VALUES(?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+    ''', (user_id, amount, amount))
+    conn.commit()
+    conn.close()
+
+def is_utr_used(utr: str) -> bool:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM used_utrs WHERE utr = ?", (utr,))
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
+
+def add_used_utr(utr: str):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO used_utrs (utr) VALUES (?)", (utr,))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass
+    conn.close()
+
+# Initialize Database at startup
+init_db()
 
 # --- GLOBAL SYSTEM LAYERS CONFIG ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
@@ -32,11 +94,9 @@ TARGET_LABELS = {
 ADMIN_CHAT_ID = 8254886110
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
-# In-Memory Ledgers
-USER_BALANCES = {}
+# In-Memory Volatile States (Safe to lose on restart)
 USER_STATES = {}
 PENDING_TX = {}
-USED_UTRS = set()  
 
 YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
 MERCHANT_NAME = "GBX"
@@ -119,7 +179,8 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             
         utr = user_text.strip()
         
-        if utr in USED_UTRS:
+        # 🚨 DB DUPLICATE CHECK LAYER (Blocks permanently used UTRs)
+        if is_utr_used(utr):
             await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
             return
             
@@ -141,13 +202,13 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     if user_text == "💰 Wallet":
-        current_bal = USER_BALANCES.get(user_id, 0.0)
+        current_bal = get_balance(user_id)
         USER_STATES[user_id] = "AWAITING_AMOUNT"
         await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount (Min ₹10):", parse_mode="Markdown")
     elif user_text == "🛠️ Customer Care":
         await update.message.reply_text("Contact: @gbx_support_bot")
     elif user_text == "📱 My Accounts":
-        current_bal = USER_BALANCES.get(user_id, 0.0)
+        current_bal = get_balance(user_id)
         await update.message.reply_text(f"🆔 ID: `{user_id}`\n💰 Balance: `₹{current_bal:.2f}`", parse_mode="Markdown")
     elif user_text == "➕ New Login":
         await update.message.reply_text("🚧 Terminal Interface Active.")
@@ -165,25 +226,25 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
     
     if action == "adm_accept":
         amount, utr = float(data[2]), data[3]
-        if utr in USED_UTRS:
+        if is_utr_used(utr):
             await query.message.edit_text("❌ Already processed.")
             return
             
-        USED_UTRS.add(utr)  
+        add_used_utr(utr)  # Log UTR into hard DB permanent record
+        update_balance(target_user, amount) # Securely add to persistent storage
         PENDING_TX.pop(target_user, None)
-        USER_BALANCES[target_user] = USER_BALANCES.get(target_user, 0.0) + amount
         
+        new_total = get_balance(target_user)
         await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
         if bot_app:
             try:
-                await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{USER_BALANCES[target_user]}")
+                await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
             except: pass
     else:
         PENDING_TX.pop(target_user, None)
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
-                # 🚨 EXACT CUSTOM EMOJI AND TEXT ALIGNMENT REQUESTED BY USER
                 rejection_text = (
                     "⌛**payment Rejected!** Invalid or Wrong UTR ❌\n\n"
                     "CONTACT ADMIN 👉 @gbx_support_bot 🙃"

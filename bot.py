@@ -12,11 +12,10 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- MASTER SUPABASE NATIVE POOLER CONNECTION ---
+# --- MASTER SUPABASE NATIVE CONNECTION LAYER ---
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 def get_db_connection(retries=3):
-    """Attempts to connect to Supabase, retrying if the server was sleeping."""
     for i in range(retries):
         try:
             conn = psycopg2.connect(DB_URI, connect_timeout=15)
@@ -25,8 +24,8 @@ def get_db_connection(retries=3):
         except Exception as e:
             logging.error(f"Database connection attempt {i+1} failed: {e}")
             if i < retries - 1:
-                time.sleep(2)  # Wait for pooler to warm up
-    raise Exception("Could not connect to Supabase after multiple retries.")
+                time.sleep(2)
+    raise Exception("Could not connect to Supabase after retries.")
 
 def init_db():
     try:
@@ -45,7 +44,7 @@ def init_db():
         ''')
         cursor.close()
         conn.close()
-        logging.info("Supabase tables initialized/verified.")
+        logging.info("Supabase permanent tables verified successfully.")
     except Exception as e:
         logging.error(f"Database init error: {e}")
 
@@ -57,7 +56,9 @@ def get_balance(user_id: int) -> float:
         row = cursor.fetchone()
         cursor.close()
         conn.close()
-        return float(row[0]) if row else 0.0
+        if row is not None:
+            return float(row[0])
+        return 0.0
     except Exception as e:
         logging.error(f"Error getting balance for user {user_id}: {e}")
         return 0.0
@@ -66,15 +67,24 @@ def update_balance(user_id: int, amount: float):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO users (user_id, balance) VALUES(%s, %s)
-            ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
-        ''', (user_id, amount, amount))
+        
+        # Check if user exists
+        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        
+        if row is not None:
+            # User exists, update current balance directly
+            new_bal = float(row[0]) + amount
+            cursor.execute("UPDATE users SET balance = %s WHERE user_id = %s", (new_bal, user_id))
+        else:
+            # User does not exist, insert dynamic new row mapping
+            cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, %s)", (user_id, amount))
+            
         cursor.close()
         conn.close()
-        logging.info(f"Balance updated successfully for {user_id}: +{amount}")
+        logging.info(f"Balance verified and committed for {user_id}: +{amount}")
     except Exception as e:
-        logging.error(f"Error updating balance for user {user_id}: {e}")
+        logging.error(f"Critical error updating balance for user {user_id}: {e}")
 
 def is_utr_used(utr: str) -> bool:
     try:
@@ -96,11 +106,11 @@ def add_used_utr(utr: str):
         cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (str(utr).strip(),))
         cursor.close()
         conn.close()
-        logging.info(f"UTR {utr} permanently blacklisted.")
+        logging.info(f"UTR {utr} registered permanently.")
     except Exception as e:
         logging.error(f"Error storing UTR {utr}: {e}")
 
-# Trigger DB Verification
+# Trigger DB check
 init_db()
 
 # --- SYSTEM CONFIGS ---

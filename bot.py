@@ -75,7 +75,6 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# PARSING INCOMING DATA PAYLOADS FROM OUTSIDE SHEET WIRE
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
     
@@ -149,7 +148,16 @@ async def init_webhook_mode():
     URL = os.getenv("RENDER_EXTERNAL_URL")
     if not TOKEN or not URL: return
 
-    bot_app = Application.builder().token(TOKEN).updater(None).build()
+    # TIMEOUT ENGINE PROTECTION INTEGRATION
+    bot_app = (
+        Application.builder()
+        .token(TOKEN)
+        .connect_timeout(30.0)
+        .read_timeout(30.0)
+        .updater(None)
+        .build()
+    )
+    
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
@@ -171,4 +179,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+                                  

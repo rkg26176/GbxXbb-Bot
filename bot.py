@@ -183,10 +183,14 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
-                # 🚨 UPDATED CUSTOM REJECTION TEXT FOR USER
+                # 🚨 EXACT CUSTOM EMOJI AND TEXT ALIGNMENT REQUESTED BY USER
+                rejection_text = (
+                    "⌛**payment Rejected!** Invalid or Wrong UTR ❌\n\n"
+                    "CONTACT ADMIN 👉 @gbx_support_bot 🙃"
+                )
                 await bot_app.bot.send_message(
                     chat_id=target_user, 
-                    text="**payment Rejected!** Invalid or Wrong Utr\nContact admin 👉 @gbx_support_bot",
+                    text=rejection_text,
                     parse_mode="Markdown"
                 )
             except: pass
@@ -248,4 +252,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+        

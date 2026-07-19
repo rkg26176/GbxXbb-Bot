@@ -128,7 +128,6 @@ def load_dashboard_menu():
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
     ], resize_keyboard=True)
 
-# Helper function to get remaining channels for a user
 async def get_remaining_channels(user_id: int):
     global bot_app
     remaining = []
@@ -152,7 +151,6 @@ async def show_force_join_menu(update: Update, remaining: list):
     total_left = len(remaining)
     text = f"⚠️ **Access Denied!**\n\nAbhi bhi `{total_left}` channels join karna baki hai. Niche diye gaye channels ko join karein:"
     
-    # 🚨 CRITICAL FIX: Destroys the bottom Reply Menu completely so user can't click dashboard buttons anymore!
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
     await update.message.reply_text("🔒 *Dashboard features locked until joined!*", reply_markup=ReplyKeyboardRemove(), parse_mode="Markdown")
 
@@ -164,7 +162,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
-# --- DYNAMIC EDIT BUTTONS HANDLER ---
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -188,7 +185,6 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         text = f"⚠️ **Access Denied!**\n\nKripya baki bache `{total_left}` channels bhi join karein:"
         
         try:
-            # Edit current text message to reflect only unjoined channels dynamically
             await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
         except TelegramError:
             await query.answer(text=f"❌ Baki ke {total_left} channels abhi baki hain!", show_alert=True)
@@ -198,11 +194,9 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     user_text = update.message.text
     
-    # 🚨 HARD CORE GATEKEEPER CHECK ON ANY TEXT EVENT
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         USER_STATES[user_id] = None
-        # Block instantly and remove bottom layout completely
         buttons = []
         for target in remaining:
             buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
@@ -213,7 +207,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup=InlineKeyboardMarkup(buttons), 
             parse_mode="Markdown"
         )
-        # Force remove layout immediately
         await update.message.reply_text("⛔ *Access Revoked!*", reply_markup=ReplyKeyboardRemove())
         return
 
@@ -283,7 +276,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-# --- ACTION LOGIC FOR CHECKER BOT BUTTONS ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
@@ -346,7 +338,6 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI SERVER MODULE ---
 api_app = FastAPI()
 
 @api_app.get("/")

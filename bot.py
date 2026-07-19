@@ -52,11 +52,12 @@ async def show_force_join_menu(update: Update):
     elif update.callback_query: 
         await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
-# CLEAN MATRIX LAYOUT: Removed Wallet and New Login from here
+# MASTER KEYBOARD CONFIGURATION (Char Options + Bottom Mini App Button)
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
-        [KeyboardButton("📱 My Accounts"), KeyboardButton("🏠 Home")],
+        [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ New Login")],
+        [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Support")],
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
     ], resize_keyboard=True)
 
@@ -75,9 +76,32 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
+# KEYBOARD BUTTON INTERCEPTOR ROUTER
+async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    
+    # Customer Care text check handler logic
+    if user_text == "🛠️ Customer Support":
+        support_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(text="💬 Contact Support Bot", url="https://t.me/gbx_support_bot")]
+        ])
+        await update.message.reply_text(
+            "🙋‍♂️ **GBX Support System**\n\nAgar aapko koi dikkat ya sawaal hai, toh niche diye gaye button par click karke hamare support bot se connect karein.",
+            reply_markup=support_keyboard,
+            parse_mode="Markdown"
+        )
+        return
+        
+    # Wallet page layout link check hook
+    elif user_text == "💰 Wallet":
+        await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment gateway integrations active)*", parse_mode="Markdown")
+        return
+
+    # Default routing structure
+    await start(update, context)
+
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_payload_wire = update.effective_message.web_app_data.data
-    
     try:
         segmented_nodes = raw_payload_wire.split("^")
         extracted_tx_code = segmented_nodes[0].split(":")[1]
@@ -93,10 +117,8 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         compiled_receipt += "🚚 *Status: Dispatch pending account clearance.*"
         
         await update.message.reply_text(compiled_receipt, parse_mode="Markdown")
-        
     except Exception as data_err:
-        logging.error(f"Text processing wire parsing error: {data_err}")
-        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Summary Data Payload:* {raw_payload_wire}")
+        await update.message.reply_text(f"🎉 **Order Placed Successfully!**\n\n📦 *Payload:* {raw_payload_wire}")
 
 # --- FASTAPI SERVER MODULE ---
 api_app = FastAPI()
@@ -108,37 +130,29 @@ def home():
 @api_app.get("/api/search")
 def proxy_search(query: str = "milk", page: int = 1):
     api_key = os.getenv("PARSE_BOT_API_KEY")
-    if not api_key:
-        return {"products": []}
-
+    if not api_key: return {"products": []}
     encoded_query = urllib.parse.quote(query.lower().strip())
     url = f"https://api.parse.bot/scraper/1d9ca2c5-176c-4bc0-9cf3-db9056850958/search_products?page={page}&query={encoded_query}"
-    
     req = urllib.request.Request(url)
     req.add_header("X-API-Key", api_key)
-    
     try:
         with urllib.request.urlopen(req, timeout=8.0) as response:
             raw_data = json.loads(response.read().decode('utf-8'))
             extracted_items = []
-            if isinstance(raw_data, list):
-                extracted_items = raw_data
+            if isinstance(raw_data, list): extracted_items = raw_data
             elif isinstance(raw_data, dict):
                 for key in ["results", "products", "data", "items"]:
                     if isinstance(raw_data.get(key), list) and len(raw_data.get(key)) > 0:
                         extracted_items = raw_data[key]
                         break
-            
             formatted_out = []
             for node in extracted_items[:15]:
                 title = node.get("title") or node.get("name") or "BigBasket Item"
                 price = node.get("price") or node.get("sale_price") or 45
                 image = node.get("image") or node.get("image_url") or ""
                 formatted_out.append({"title": title, "price": int(price), "image": image})
-                
             return {"products": formatted_out}
-    except Exception as e:
-        logging.error(f"Scraper error routing: {e}")
+    except Exception:
         return {"products": []}
 
 @api_app.on_event("startup")
@@ -148,19 +162,11 @@ async def init_webhook_mode():
     URL = os.getenv("RENDER_EXTERNAL_URL")
     if not TOKEN or not URL: return
 
-    bot_app = (
-        Application.builder()
-        .token(TOKEN)
-        .connect_timeout(30.0)
-        .read_timeout(30.0)
-        .updater(None)
-        .build()
-    )
-    
+    bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
-    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, start))
+    bot_app.add_handler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages)
     
     await bot_app.initialize()
     await bot_app.start()

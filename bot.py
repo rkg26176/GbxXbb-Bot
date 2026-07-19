@@ -20,14 +20,12 @@ DB_FILE = "gbx_database.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # Users Balance Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             balance REAL DEFAULT 0.0
         )
     ''')
-    # Used UTRs Table to prevent duplicates forever
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS used_utrs (
             utr TEXT PRIMARY KEY
@@ -94,7 +92,7 @@ TARGET_LABELS = {
 ADMIN_CHAT_ID = 8254886110
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
-# In-Memory Volatile States (Safe to lose on restart)
+# In-Memory Volatile States
 USER_STATES = {}
 PENDING_TX = {}
 
@@ -179,7 +177,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             
         utr = user_text.strip()
         
-        # 🚨 DB DUPLICATE CHECK LAYER (Blocks permanently used UTRs)
         if is_utr_used(utr):
             await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
             return
@@ -206,7 +203,8 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         USER_STATES[user_id] = "AWAITING_AMOUNT"
         await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount (Min ₹10):", parse_mode="Markdown")
     elif user_text == "🛠️ Customer Care":
-        await update.message.reply_text("Contact: @gbx_support_bot")
+        # Fixed underscore escaping here as well
+        await update.message.reply_text("Contact: @gbx\_support\_bot", parse_mode="Markdown")
     elif user_text == "📱 My Accounts":
         current_bal = get_balance(user_id)
         await update.message.reply_text(f"🆔 ID: `{user_id}`\n💰 Balance: `₹{current_bal:.2f}`", parse_mode="Markdown")
@@ -230,8 +228,8 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             await query.message.edit_text("❌ Already processed.")
             return
             
-        add_used_utr(utr)  # Log UTR into hard DB permanent record
-        update_balance(target_user, amount) # Securely add to persistent storage
+        add_used_utr(utr)  
+        update_balance(target_user, amount) 
         PENDING_TX.pop(target_user, None)
         
         new_total = get_balance(target_user)
@@ -245,9 +243,10 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
+                # 🚨 FIXED: Underscores escaped with backslashes (\_) to render properly in Markdown
                 rejection_text = (
                     "⌛**payment Rejected!** Invalid or Wrong UTR ❌\n\n"
-                    "CONTACT ADMIN 👉 @gbx_support_bot 🙃"
+                    "CONTACT ADMIN 👉 @gbx\_support\_bot 🙃"
                 )
                 await bot_app.bot.send_message(
                     chat_id=target_user, 

@@ -45,7 +45,7 @@
         .tab-item.active .tab-icon-frame { background: white; border-color: #ddd; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .tab-label { font-size: 11px; font-weight: 700; text-align: center; color: #222; }
 
-        /* Catalog Layout Components */
+        /* Catalog Layout */
         .promo-banner-space { padding: 12px 16px; background: white; display: block; }
         .bb-fluid-banner { width: 100%; border-radius: 12px; display: block; object-fit: cover; }
         .section-header-title { padding: 16px 16px 6px 16px; font-size: 16px; font-weight: 800; color: #000; display: flex; justify-content: space-between; align-items: center; }
@@ -61,71 +61,47 @@
         .actual-price { font-size: 15px; font-weight: 800; color: #000; }
         .mrp-cross { font-size: 11px; color: #999; text-decoration: line-through; }
 
-        /* ADD Action Systems */
         .add-action-box { width: 68px; height: 28px; }
         .bb-ui-add-btn { width: 100%; height: 100%; background: white; color: #ff3f6c; border: 1px solid #ff3f6c; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: pointer; }
-        .bb-ui-qty-box { display: none; width: 100%; height: 100%; background: var(--bb-green); color: white; border-radius: 6px; justify-content: space-between; align-items: center; }
-        .bb-qty-btn { background: transparent; border: none; color: white; width: 22px; height: 100%; font-weight: bold; cursor: pointer; }
 
-        /* Bottom Sheets Base Layout */
-        .popup-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; }
-        .bottom-sheet { position: fixed; bottom: -100%; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; z-index: 100000; transition: bottom 0.3s ease-out; max-height: 85vh; overflow-y: auto; }
-        .bottom-sheet.active { bottom: 0; }
+        /* WALLET VIEW PANEL INTERFACE */
+        .wallet-panel-wrapper { display: none; padding: 20px 16px; }
+        .wallet-balance-card { background: linear-gradient(135deg, #0c3e19, #1b5e20); color: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 15px rgba(12,62,25,0.25); margin-bottom: 24px; }
+        .wallet-lbl { font-size: 13px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .wallet-amount { font-size: 32px; font-weight: 900; margin-top: 8px; }
         
-        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .sheet-title { font-size: 16px; font-weight: 800; color: #000; text-transform: uppercase; }
-        .sheet-close { font-size: 20px; color: #666; cursor: pointer; font-weight: bold; }
+        .wallet-menu-list { background: white; border-radius: 12px; border: 1px solid #eef0f2; overflow: hidden; }
+        .wallet-menu-item { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid #f5f6f7; cursor: pointer; }
+        .wallet-menu-item:last-child { border: none; }
+        .wallet-item-icon { font-size: 20px; }
+        .wallet-item-text { font-size: 14px; font-weight: 700; color: #333; }
+        .wallet-item-arrow { margin-left: auto; color: #ccc; font-weight: bold; }
 
-        .sheet-search-box { background: #f5f6f7; border: 1px solid #e2e3e4; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; margin-bottom: 16px; }
-        .sheet-input-field { width: 100%; border: none; background: transparent; padding: 12px 0; font-size: 14px; outline: none; }
-
-        .current-loc-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #d4ebd2; background: white; color: var(--bb-dark-green); padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; width: 100%; }
-        .section-label { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; margin-bottom: 12px; }
+        /* Bottom Navbar Layer Shell */
+        .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 0; z-index: 99999; box-shadow: 0 -2px 10px rgba(0,0,0,0.03); }
+        .nav-tab-node { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: #888; }
+        .nav-tab-node.active { color: var(--bb-green); }
         
-        .saved-addr-card { background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 12px; padding: 14px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
-        .addr-badge { background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-        .addr-title-txt { font-size: 15px; font-weight: 800; color: #111; }
-        .addr-desc-txt { font-size: 13px; color: #555; margin-top: 4px; line-height: 1.4; }
-
-        .form-row-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .input-group { display: flex; flex-direction: column; margin-bottom: 14px; }
-        .input-group label { font-size: 12px; font-weight: 700; color: #666; margin-bottom: 6px; }
-        .form-control-input { background: white; border: 1px solid #d2d4d6; border-radius: 8px; padding: 12px; font-size: 14px; outline: none; color: #222; }
-
-        .save-as-row { display: flex; gap: 10px; margin-bottom: 16px; }
-        .type-pill { border: 1px solid #d2d4d6; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; background: white; cursor: pointer; }
-        .type-pill.active { border-color: var(--bb-dark-green); background: #e8f5e9; color: var(--bb-dark-green); }
-
-        .action-submit-btn { background: var(--bb-dark-green); color: white; border: none; width: 100%; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; text-transform: uppercase; }
-        .coordinate-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4e820d; font-weight: 700; margin-left: auto; }
-
-        /* Bottom Widgets */
+        /* Floating Checkout Widgets */
         .bottom-widgets-layer { position: fixed; bottom: 65px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px; pointer-events: none; z-index: 99999; }
         .app-checkout-pill { background: var(--bb-dark-green); color: white; width: 100%; border-radius: 30px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
         .checkout-pill-bill { font-size: 16px; font-weight: 800; }
-        .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 0; z-index: 99999; }
-        .nav-tab-node { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: #888; }
-        .nav-tab-node.active { color: var(--bb-green); }
-        .shimmer-state { grid-column: span 2; text-align: center; padding: 40px 20px; color: #888; }
-        
-        .search-results-tray { display: none; background: white; border: 1px solid #e2e3e4; border-radius: 10px; max-height: 200px; overflow-y: auto; margin-bottom: 16px; }
-        .tray-item { padding: 12px; border-bottom: 1px solid #f5f6f7; font-size: 13px; cursor: pointer; font-weight: 600; color: #444; }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
+    <!-- Header Frame Shell -->
     <div class="bb-sticky-header" id="header-shell">
         <div class="delivery-row">
-            <div class="location-dropdown-container" onclick="openLocationPanel()">
+            <div class="location-dropdown-container">
                 <span class="location-icon">📍</span>
                 <div>
                     <div class="eta-badge">⚡ 5 mins</div>
-                    <div class="location-text-node" id="top-loc-string">Locating current address...</div>
+                    <div class="location-text-node">Ranchi, Jharkhand</div>
                 </div>
-                <span class="arrow-down-icon">∨</span>
             </div>
-            <div class="profile-btn">R</div>
+            <!-- Top bar Profile icon opens wallet directly now -->
+            <div class="profile-btn" id="avatar-btn" onclick="switchNavTab('wallet')">R</div>
         </div>
         <div class="search-container">
             <div class="search-bar-inner">
@@ -150,7 +126,7 @@
         </div>
     </div>
 
-    <!-- MAIN VIEWS -->
+    <!-- VIEW 1: MAIN HOME VIEW -->
     <div id="view-home">
         <div class="promo-banner-space">
             <img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="banner">
@@ -161,92 +137,33 @@
         <div class="product-grid-container" id="catalog-grid-root"></div>
     </div>
 
-    <!-- POPUP 1: SELECT LOCATION -->
-    <div class="popup-overlay" id="overlay-select-loc" onclick="closeAllSheets()"></div>
-    <div class="bottom-sheet" id="sheet-select-loc">
-        <div class="sheet-header">
-            <div class="sheet-title">Select Delivery Location</div>
-            <div class="sheet-close" onclick="closeAllSheets()">×</div>
+    <!-- VIEW 2: DYNAMIC WALLET VIEW LAYER -->
+    <div id="view-wallet" class="wallet-panel-wrapper">
+        <div class="wallet-balance-card">
+            <div class="wallet-lbl">BigBasket Wallet Balance</div>
+            <div class="wallet-amount">₹500.00</div>
         </div>
         
-        <div class="sheet-search-box">
-            <span style="margin-right:8px; color:#888;">🔍</span>
-            <input type="text" class="sheet-input-field" id="loc-search-input" placeholder="Search for your location" oninput="handleManualSearchRouting(this.value)">
-        </div>
-
-        <div class="search-results-tray" id="tray-suggestions"></div>
-
-        <button class="current-loc-btn" onclick="triggerNativeGPS()">
-            <span style="font-size:16px;">🎯</span> Use current location
-        </button>
-
-        <div class="section-label">Saved Addresses</div>
-        <div class="saved-addr-card" onclick="openEditAddressPanel()">
-            <div class="addr-badge">📍</div>
-            <div>
-                <div class="addr-title-txt"><span id="saved-card-type">Home</span> <span style="background:#e8f5e9; color:var(--bb-dark-green); font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px;">SELECTED</span></div>
-                <div class="addr-desc-txt" id="saved-card-desc-render">Syncing network coordinates...</div>
+        <div class="wallet-menu-list">
+            <div class="wallet-menu-item">
+                <span class="wallet-item-icon">➕</span>
+                <span class="wallet-item-text">Add Money to Wallet</span>
+                <span class="wallet-item-arrow">›</span>
+            </div>
+            <div class="wallet-menu-item">
+                <span class="wallet-item-icon">📜</span>
+                <span class="wallet-item-text">Transaction History</span>
+                <span class="wallet-item-arrow">›</span>
+            </div>
+            <div class="wallet-menu-item">
+                <span class="wallet-item-icon">🎁</span>
+                <span class="wallet-item-text">Redeem Gift Card</span>
+                <span class="wallet-item-arrow">›</span>
             </div>
         </div>
-        
-        <button class="action-submit-btn" style="margin-top:20px; background:#f5f6f7; color:#333; border:1px solid #d2d4d6;" onclick="openEditAddressPanel(true)">+ Add New Address</button>
     </div>
 
-    <!-- POPUP 2: EDIT ADDRESS -->
-    <div class="popup-overlay" id="overlay-edit-addr" onclick="closeEditAddressSheet()"></div>
-    <div class="bottom-sheet" id="sheet-edit-addr">
-        <div class="sheet-header">
-            <div class="sheet-title">Edit Address</div>
-            <div class="sheet-close" onclick="closeEditAddressSheet()">×</div>
-        </div>
-
-        <div class="sheet-search-box">
-            <span style="margin-right:8px; color:#888;">🔍</span>
-            <input type="text" class="sheet-input-field" placeholder="Search for area, street, society..." oninput="handleManualSearchRouting(this.value)">
-        </div>
-
-        <button class="current-loc-btn" style="padding:10px; font-size:14px; margin-bottom:14px;" onclick="triggerNativeGPS()">
-            <span>🎯</span> Use my location 
-            <span class="coordinate-indicator" id="geo-coord-display">Locating GPS...</span>
-        </button>
-
-        <div class="section-label" style="margin-bottom:8px;">Save as</div>
-        <div class="save-as-row">
-            <div class="type-pill active" id="pill-Home" onclick="setAddressType('Home')">🏠 Home</div>
-            <div class="type-pill" id="pill-Work" onclick="setAddressType('Work')">💼 Work</div>
-            <div class="type-pill" id="pill-Other" onclick="setAddressType('Other')">📌 Other</div>
-        </div>
-
-        <div class="input-group">
-            <label>House / Flat no.</label>
-            <input type="text" class="form-control-input" id="input-house" placeholder="House no / Details">
-        </div>
-
-        <div class="input-group">
-            <label>Area / Society</label>
-            <input type="text" class="form-control-input" id="input-area" placeholder="Area Name">
-        </div>
-
-        <div class="input-group">
-            <label>Landmark (optional)</label>
-            <input type="text" class="form-control-input" id="input-landmark" placeholder="Near landmark">
-        </div>
-
-        <div class="form-row-grid">
-            <div class="input-group">
-                <label>PIN code</label>
-                <input type="text" class="form-control-input" id="input-pincode" placeholder="Pincode">
-            </div>
-            <div class="input-group">
-                <label>Contact number</label>
-                <input type="text" class="form-control-input" id="input-phone" placeholder="Phone number">
-            </div>
-        </div>
-
-        <button class="action-submit-btn" onclick="saveAddressFormData()">Update address</button>
-    </div>
-
-    <!-- Checkout Widget -->
+    <!-- Floating Checkout Widget Layer -->
     <div class="bottom-widgets-layer" id="checkout-sheet-widget" style="display: none;">
         <div class="app-checkout-pill" onclick="processFinalCheckout()">
             <div>
@@ -257,11 +174,18 @@
         </div>
     </div>
 
-    <!-- Bottom Navbar -->
+    <!-- Absolute Navigation Bottom Navbar Shell -->
     <div class="app-bottom-navbar">
-        <div class="nav-tab-node active"><span style="font-size:18px;">🏠</span><div style="font-size:10px; font-weight:700;">Home</div></div>
-        <div class="nav-tab-node"><span style="font-size:18px;">🗂️</span><div style="font-size:10px; font-weight:700;">Categories</div></div>
-        <div class="nav-tab-node"><span style="font-size:18px;">👤</span><div style="font-size:10px; font-weight:700;">My Account</div></div>
+        <div class="nav-tab-node active" id="nav-home-node" onclick="switchNavTab('home')">
+            <span style="font-size:18px;">🏠</span><div style="font-size:10px; font-weight:700;">Home</div>
+        </div>
+        <div class="nav-tab-node" id="nav-cat-node" onclick="switchNavTab('categories')">
+            <span style="font-size:18px;">🗂️</span><div style="font-size:10px; font-weight:700;">Categories</div>
+        </div>
+        <!-- Right corner changes to Wallet Now -->
+        <div class="nav-tab-node" id="nav-wallet-node" onclick="switchNavTab('wallet')">
+            <span style="font-size:18px;">💰</span><div style="font-size:10px; font-weight:700;">Wallet</div>
+        </div>
     </div>
 
     <script>
@@ -271,42 +195,87 @@
 
         let applicationCart = {};
         let localizedBillSum = 0;
-        let selectedAddressType = "Home";
-        
-        let currentCapturedLocation = {
-            type: "Home",
-            house: "",
-            area: "Detecting location...",
-            landmark: "",
-            pincode: "",
-            phone: "",
-            coords: "0.0, 0.0"
-        };
 
-        function updateTopBarStringDisplay() {
-            let displayString = "";
-            if(currentCapturedLocation.house) {
-                displayString = `${currentCapturedLocation.type} - ${currentCapturedLocation.house}, ${currentCapturedLocation.area}`;
-            } else {
-                displayString = `${currentCapturedLocation.area}`;
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            const runtimeUser = tg.initDataUnsafe.user;
+            if(runtimeUser.first_name) {
+                document.getElementById('avatar-btn').innerText = runtimeUser.first_name.charAt(0).toUpperCase();
             }
-            document.getElementById('top-loc-string').innerText = displayString.length > 30 ? displayString.substring(0, 28) + "..." : displayString;
-            document.getElementById('saved-card-type').innerText = currentCapturedLocation.type;
-            document.getElementById('saved-card-desc-render').innerText = `${currentCapturedLocation.house ? currentCapturedLocation.house + ', ' : ''}${currentCapturedLocation.area}`;
         }
 
-        function openLocationPanel() {
-            document.getElementById('overlay-select-loc').style.display = 'block';
-            setTimeout(() => { document.getElementById('sheet-select-loc').classList.add('active'); }, 50);
+        function switchNavTab(targetTab) {
+            document.querySelectorAll('.nav-tab-node').forEach(n => n.classList.remove('active'));
+            
+            if(targetTab === 'home') {
+                document.getElementById('nav-home-node').classList.add('active');
+                document.getElementById('header-shell').style.display = 'block';
+                document.getElementById('view-home').style.display = 'block';
+                document.getElementById('view-wallet').style.display = 'none';
+            } else if(targetTab === 'wallet') {
+                document.getElementById('nav-wallet-node').classList.add('active');
+                document.getElementById('header-shell').style.display = 'block';
+                document.getElementById('view-home').style.display = 'none';
+                document.getElementById('view-wallet').style.display = 'block';
+            } else if(targetTab === 'categories') {
+                document.getElementById('nav-cat-node').classList.add('active');
+                switchNavTab('home');
+            }
         }
 
-        function closeAllSheets() {
-            document.getElementById('sheet-select-loc').classList.remove('active');
-            setTimeout(() => { document.getElementById('overlay-select-loc').style.display = 'none'; }, 300);
+        function quickFilterCategory(elem, key) {
+            document.querySelectorAll('.tab-item').forEach(i => i.classList.remove('active'));
+            elem.classList.add('active');
+            document.getElementById('bb-search-box').value = key;
+            executeAppSearch();
         }
 
-        function openEditAddressPanel(clearFields = false) {
-            document.getElementById('sheet-select-loc').classList.remove('active');
-            document.getElementById('overlay-select-loc').style.display = 'none';
+        async function executeAppSearch() {
+            const root = document.getElementById('catalog-grid-root');
+            root.innerHTML = '';
+            const mockData = [
+                {"title": "Cadbury Dairy Milk Chocolate", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
+                {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg", "wgt": "400 g"},
+                {"title": "Sunfeast Dark Fantasy Choco Fills", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/40003154_6-sunfeast-dark-fantasy-choco-fills.jpg", "wgt": "75 g"}
+            ];
 
-            setAddressType(clearFiel
+            mockData.forEach((prod, i) => {
+                const card = document.createElement('div');
+                card.className = 'bb-product-card';
+                card.innerHTML = `
+                    <div class="discount-tag">15% OFF</div>
+                    <div class="card-media-wrapper"><img class="card-img" src="${prod.image}"></div>
+                    <div class="product-meta-brand">BB Certified</div>
+                    <div class="product-meta-title">${prod.title}</div>
+                    <div class="product-meta-wgt">${prod.wgt}</div>
+                    <div class="card-footer-pricing">
+                        <div><span class="actual-price">₹${prod.price}</span></div>
+                        <div class="add-action-box">
+                            <button class="bb-ui-add-btn" onclick="cartAdd(${i},'${prod.title}',${prod.price})">Add</button>
+                        </div>
+                    </div>
+                `;
+                root.appendChild(card);
+            });
+        }
+
+        function cartAdd(i, title, price) {
+            applicationCart[i] = { title, price, qty: 1 };
+            localizedBillSum = price;
+            document.getElementById('checkout-sheet-widget').style.display = 'flex';
+            document.getElementById('checkout-total-val').innerText = `₹${localizedBillSum}`;
+            document.getElementById('checkout-count-val').innerText = `1 Item added`;
+        }
+
+        function processFinalCheckout() {
+            const txCode = "BB" + Math.floor(400000 + Math.random() * 590000);
+            const wireString = `TX_REF:${txCode}^FINAL_AMT:₹${localizedBillSum}^LOC:Ranchi, Jharkhand`;
+            tg.sendData(wireString);
+            tg.close();
+        }
+
+        window.onload = function() {
+            executeAppSearch();
+        };
+    </script>
+</body>
+</html>

@@ -5,7 +5,7 @@ import urllib.parse
 import json
 import random
 import re
-import sqlite3
+import psycopg2
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -14,63 +14,70 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- DATABASE LAYER (PERMANENT STORAGE) ---
-DB_FILE = "gbx_database.db"
+# --- MASTER SUPABASE CLOUD DATABASE LAYER ---
+DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = psycopg2.connect(DB_URI)
     cursor = conn.cursor()
+    # Permanent Table for Users Balance
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
+            user_id BIGINT PRIMARY KEY,
             balance REAL DEFAULT 0.0
         )
     ''')
+    # Permanent Table for Blocking Duplicate UTRs
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS used_utrs (
             utr TEXT PRIMARY KEY
         )
     ''')
     conn.commit()
+    cursor.close()
     conn.close()
 
 def get_balance(user_id: int) -> float:
-    conn = sqlite3.connect(DB_FILE)
+    conn = psycopg2.connect(DB_URI)
     cursor = conn.cursor()
-    cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     return row[0] if row else 0.0
 
 def update_balance(user_id: int, amount: float):
-    conn = sqlite3.connect(DB_FILE)
+    conn = psycopg2.connect(DB_URI)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO users (user_id, balance) VALUES(?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+        INSERT INTO users (user_id, balance) VALUES(%s, %s)
+        ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
     ''', (user_id, amount, amount))
     conn.commit()
+    cursor.close()
     conn.close()
 
 def is_utr_used(utr: str) -> bool:
-    conn = sqlite3.connect(DB_FILE)
+    conn = psycopg2.connect(DB_URI)
     cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM used_utrs WHERE utr = ?", (utr,))
+    cursor.execute("SELECT 1 FROM used_utrs WHERE utr = %s", (utr,))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     return row is not None
 
 def add_used_utr(utr: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = psycopg2.connect(DB_URI)
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO used_utrs (utr) VALUES (?)", (utr,))
+        cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s)", (utr,))
         conn.commit()
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         pass
+    cursor.close()
     conn.close()
 
-# Initialize Database at startup
+# Initialize Database cloud structure
 init_db()
 
 # --- GLOBAL SYSTEM LAYERS CONFIG ---
@@ -92,7 +99,7 @@ TARGET_LABELS = {
 ADMIN_CHAT_ID = 8254886110
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
-# In-Memory Volatile States
+# In-Memory Volatile States (Safe to lose on restart)
 USER_STATES = {}
 PENDING_TX = {}
 
@@ -203,7 +210,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         USER_STATES[user_id] = "AWAITING_AMOUNT"
         await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount (Min ₹10):", parse_mode="Markdown")
     elif user_text == "🛠️ Customer Care":
-        # Safe link in HTML mode to maintain underscore structure
         await update.message.reply_text("Contact: @gbx_support_bot")
     elif user_text == "📱 My Accounts":
         current_bal = get_balance(user_id)
@@ -243,7 +249,7 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
-                # 🚨 FIXED USING HTML MODE: Perfect line breaks, alignment, and full blue link parsing
+                # Fixed HTML Clean Link Parsing
                 rejection_text = (
                     "⌛<b>Payment Rejected!</b>\n"
                     "Invalid Or Wrong UTR ❌\n\n"
@@ -314,4 +320,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+                    

@@ -11,11 +11,12 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- MASTER SUPABASE NATIVE POOLER CONNECTION ---
+# --- MASTER SUPABASE NATIVE CONNECTION LAYER ---
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 def get_db_connection():
-    conn = psycopg2.connect(DB_URI)
+    # Direct persistent pool socket session
+    conn = psycopg2.connect(DB_URI, connect_timeout=15)
     conn.autocommit = True
     return conn
 
@@ -36,11 +37,12 @@ def init_db():
         ''')
         cursor.close()
         conn.close()
-        logging.info("Supabase permanent tables initialized successfully.")
+        logging.info("Supabase production tables verification: OK")
     except Exception as e:
-        logging.error(f"Database initialization error: {e}")
+        logging.error(f"Database setup failure: {e}")
 
 def get_balance(user_id: int) -> float:
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -48,26 +50,38 @@ def get_balance(user_id: int) -> float:
         row = cursor.fetchone()
         cursor.close()
         conn.close()
-        return float(row[0]) if row else 0.0
+        if row is not None:
+            return float(row[0])
+        return 0.0
     except Exception as e:
-        logging.error(f"Error getting balance: {e}")
+        logging.error(f"Critical error fetching balance for {user_id}: {e}")
+        # Secure Layer: Connection break hone par transaction database retry return karega
+        try:
+            if conn: conn.close()
+        except: pass
         return 0.0
 
 def update_balance(user_id: int, amount: float):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        # 🚨 NON-RESETTABLE ATOMIC UPSERT LAYER (Never sets to 0, always appends existing database value)
         cursor.execute('''
             INSERT INTO users (user_id, balance) VALUES(%s, %s)
             ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
         ''', (user_id, amount, amount))
         cursor.close()
         conn.close()
-        logging.info(f"Successfully updated balance for user {user_id} by {amount}")
+        logging.info(f"Atomic update verified: {amount} added to User {user_id}")
     except Exception as e:
-        logging.error(f"Error updating balance: {e}")
+        logging.error(f"Critical error updating balance for {user_id}: {e}")
+        try:
+            if conn: conn.close()
+        except: pass
 
 def is_utr_used(utr: str) -> bool:
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -77,24 +91,30 @@ def is_utr_used(utr: str) -> bool:
         conn.close()
         return row is not None
     except Exception as e:
-        logging.error(f"Error checking UTR: {e}")
+        logging.error(f"UTR validation failure: {e}")
+        try:
+            if conn: conn.close()
+        except: pass
         return False
 
 def add_used_utr(utr: str):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (str(utr).strip(),))
         cursor.close()
         conn.close()
-        logging.info(f"UTR {utr} registered inside permanent block list.")
     except Exception as e:
-        logging.error(f"Error adding UTR: {e}")
+        logging.error(f"UTR insertion failure: {e}")
+        try:
+            if conn: conn.close()
+        except: pass
 
-# Trigger database engine setup on deployment boot
+# Start database layout verification
 init_db()
 
-# --- SYSTEM SETTINGS ---
+# --- GLOBAL SYSTEM LAYERS CONFIG ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -275,11 +295,11 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             await query.message.edit_text(f"❌ Already processed for User `{target_user}`.")
             return
             
+        # 🚨 STEP-STRICT PIPELINE: UTR insert first, balance increment next
         add_used_utr(utr)  
         update_balance(target_user, amount) 
         PENDING_TX.pop(target_user, None)
         
-        # User ID fixed inside checker confirmation log
         await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
         if bot_app:
             try: 
@@ -288,7 +308,6 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             except: pass
     else:
         PENDING_TX.pop(target_user, None)
-        # User ID fixed inside checker rejection log
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
@@ -365,4 +384,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+        

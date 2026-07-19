@@ -3,6 +3,7 @@ import logging
 import random
 import re
 import psycopg2
+import time
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
@@ -11,14 +12,21 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- MASTER SUPABASE NATIVE CONNECTION LAYER ---
+# --- MASTER SUPABASE NATIVE POOLER CONNECTION ---
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
-def get_db_connection():
-    # Direct persistent pool socket session
-    conn = psycopg2.connect(DB_URI, connect_timeout=15)
-    conn.autocommit = True
-    return conn
+def get_db_connection(retries=3):
+    """Attempts to connect to Supabase, retrying if the server was sleeping."""
+    for i in range(retries):
+        try:
+            conn = psycopg2.connect(DB_URI, connect_timeout=15)
+            conn.autocommit = True
+            return conn
+        except Exception as e:
+            logging.error(f"Database connection attempt {i+1} failed: {e}")
+            if i < retries - 1:
+                time.sleep(2)  # Wait for pooler to warm up
+    raise Exception("Could not connect to Supabase after multiple retries.")
 
 def init_db():
     try:
@@ -37,12 +45,11 @@ def init_db():
         ''')
         cursor.close()
         conn.close()
-        logging.info("Supabase production tables verification: OK")
+        logging.info("Supabase tables initialized/verified.")
     except Exception as e:
-        logging.error(f"Database setup failure: {e}")
+        logging.error(f"Database init error: {e}")
 
 def get_balance(user_id: int) -> float:
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -50,38 +57,26 @@ def get_balance(user_id: int) -> float:
         row = cursor.fetchone()
         cursor.close()
         conn.close()
-        if row is not None:
-            return float(row[0])
-        return 0.0
+        return float(row[0]) if row else 0.0
     except Exception as e:
-        logging.error(f"Critical error fetching balance for {user_id}: {e}")
-        # Secure Layer: Connection break hone par transaction database retry return karega
-        try:
-            if conn: conn.close()
-        except: pass
+        logging.error(f"Error getting balance for user {user_id}: {e}")
         return 0.0
 
 def update_balance(user_id: int, amount: float):
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        # 🚨 NON-RESETTABLE ATOMIC UPSERT LAYER (Never sets to 0, always appends existing database value)
         cursor.execute('''
             INSERT INTO users (user_id, balance) VALUES(%s, %s)
             ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
         ''', (user_id, amount, amount))
         cursor.close()
         conn.close()
-        logging.info(f"Atomic update verified: {amount} added to User {user_id}")
+        logging.info(f"Balance updated successfully for {user_id}: +{amount}")
     except Exception as e:
-        logging.error(f"Critical error updating balance for {user_id}: {e}")
-        try:
-            if conn: conn.close()
-        except: pass
+        logging.error(f"Error updating balance for user {user_id}: {e}")
 
 def is_utr_used(utr: str) -> bool:
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -91,30 +86,24 @@ def is_utr_used(utr: str) -> bool:
         conn.close()
         return row is not None
     except Exception as e:
-        logging.error(f"UTR validation failure: {e}")
-        try:
-            if conn: conn.close()
-        except: pass
+        logging.error(f"Error checking UTR {utr}: {e}")
         return False
 
 def add_used_utr(utr: str):
-    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (str(utr).strip(),))
         cursor.close()
         conn.close()
+        logging.info(f"UTR {utr} permanently blacklisted.")
     except Exception as e:
-        logging.error(f"UTR insertion failure: {e}")
-        try:
-            if conn: conn.close()
-        except: pass
+        logging.error(f"Error storing UTR {utr}: {e}")
 
-# Start database layout verification
+# Trigger DB Verification
 init_db()
 
-# --- GLOBAL SYSTEM LAYERS CONFIG ---
+# --- SYSTEM CONFIGS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -280,7 +269,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-# --- ACTION LOGIC FOR CHECKER BOT BUTTONS ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
@@ -295,7 +283,6 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             await query.message.edit_text(f"❌ Already processed for User `{target_user}`.")
             return
             
-        # 🚨 STEP-STRICT PIPELINE: UTR insert first, balance increment next
         add_used_utr(utr)  
         update_balance(target_user, amount) 
         PENDING_TX.pop(target_user, None)
@@ -384,4 +371,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-        
+            

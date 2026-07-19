@@ -52,12 +52,12 @@ async def show_force_join_menu(update: Update):
     elif update.callback_query: 
         await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
-# MASTER KEYBOARD CONFIGURATION (Char Options + Bottom Mini App Button)
+# EXACT 5-BUTTON MATRIX ENGINE (4 Operations Keyboard + 1 Large WebApp Block Button)
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ New Login")],
-        [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Support")],
+        [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Care")],
         [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
     ], resize_keyboard=True)
 
@@ -76,28 +76,33 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels join nahi kiye!", show_alert=True)
 
-# KEYBOARD BUTTON INTERCEPTOR ROUTER
+# KEYBOARD ROUTER PROCESSING PANEL
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     
-    # Customer Care text check handler logic
-    if user_text == "🛠️ Customer Support":
+    # 1. Customer Care Link Button Handler
+    if user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(text="💬 Contact Support Bot", url="https://t.me/gbx_support_bot")]
+            [InlineKeyboardButton(text="💬 Open Support Bot", url="https://t.me/gbx_support_bot")]
         ])
         await update.message.reply_text(
-            "🙋‍♂️ **GBX Support System**\n\nAgar aapko koi dikkat ya sawaal hai, toh niche diye gaye button par click karke hamare support bot se connect karein.",
+            "🙋‍♂️ **GBX Official Support**\n\nAgar aapko kisi bhi tarah ki sahayata chahiye, toh niche diye button par click karke hamare customer care support se contact karein.",
             reply_markup=support_keyboard,
             parse_mode="Markdown"
         )
         return
         
-    # Wallet page layout link check hook
+    # 2. Wallet Trigger
     elif user_text == "💰 Wallet":
-        await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment gateway integrations active)*", parse_mode="Markdown")
+        await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment dynamic operations panel)*", parse_mode="Markdown")
         return
 
-    # Default routing structure
+    # 3. Dummy routing for other keyboard keys
+    elif user_text in ["📱 My Accounts", "➕ New Login"]:
+        await update.message.reply_text(f"🚧 **{user_text}** functionality structure initialization pending.", parse_mode="Markdown")
+        return
+
+    # Default action routing fallback
     await start(update, context)
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,4 +189,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    

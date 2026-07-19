@@ -52,12 +52,12 @@ async def show_force_join_menu(update: Update):
     elif update.callback_query: 
         await update.callback_query.message.reply_text(alert_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
+# CLEAN MATRIX LAYOUT: Removed Wallet and New Login from here
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("🏠 Home")],
-        [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))],
-        [KeyboardButton("💰 Wallet"), KeyboardButton("➕ New Login")]
+        [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
     ], resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,7 +148,6 @@ async def init_webhook_mode():
     URL = os.getenv("RENDER_EXTERNAL_URL")
     if not TOKEN or not URL: return
 
-    # TIMEOUT ENGINE PROTECTION INTEGRATION
     bot_app = (
         Application.builder()
         .token(TOKEN)
@@ -179,4 +178,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-                                  
+    

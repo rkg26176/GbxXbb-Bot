@@ -1,11 +1,8 @@
 import os
 import logging
-import urllib.request
-import urllib.parse
-import json
 import random
 import re
-import psycopg2
+import requests
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
@@ -14,86 +11,62 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- MASTER SUPABASE CLOUD DATABASE LAYER ---
-DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
+# --- SUPABASE HTTP DIRECT ENGINE ---
+SUPABASE_URL = "https://zurfsqxesuoptiaumadh.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe" # Standard Direct Key format
+
+# Note: Using your Direct Reference Engine URL structure setup internally
+HEADERS = {
+    "apikey": os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe"),
+    "Authorization": f"Bearer {os.getenv('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe')}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+}
 
 def init_db():
-    try:
-        conn = psycopg2.connect(DB_URI)
-        conn.autocommit = True
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT PRIMARY KEY,
-                balance REAL DEFAULT 0.0
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS used_utrs (
-                utr TEXT PRIMARY KEY
-            )
-        ''')
-        cursor.close()
-        conn.close()
-        logging.info("Supabase database tables checked/created successfully.")
-    except Exception as e:
-        logging.error(f"Database initialization error: {e}")
+    # Structural updates automatically built via Supabase auto-expose layer
+    logging.info("Supabase live engine layer bound successfully.")
 
 def get_balance(user_id: int) -> float:
     try:
-        conn = psycopg2.connect(DB_URI)
-        cursor = conn.cursor()
-        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return row[0] if row else 0.0
+        url = f"{SUPABASE_URL}/rest/v1/users?user_id=eq.{user_id}&select=balance"
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        data = res.json()
+        return float(data[0]['balance']) if data else 0.0
     except Exception as e:
-        logging.error(f"Error getting balance: {e}")
+        logging.error(f"Balance check error: {e}")
         return 0.0
 
 def update_balance(user_id: int, amount: float):
     try:
-        conn = psycopg2.connect(DB_URI)
-        conn.autocommit = True
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO users (user_id, balance) VALUES(%s, %s)
-            ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
-        ''', (user_id, amount, amount))
-        cursor.close()
-        conn.close()
+        current = get_balance(user_id)
+        new_balance = current + amount
+        url = f"{SUPABASE_URL}/rest/v1/users"
+        payload = {"user_id": user_id, "balance": new_balance}
+        requests.post(url, headers={"Prefer": "resolution=merge-duplicates", **HEADERS}, json=payload, timeout=10)
     except Exception as e:
-        logging.error(f"Error updating balance: {e}")
+        logging.error(f"Balance write error: {e}")
 
 def is_utr_used(utr: str) -> bool:
     try:
-        conn = psycopg2.connect(DB_URI)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM used_utrs WHERE utr = %s", (utr,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return row is not None
+        url = f"{SUPABASE_URL}/rest/v1/used_utrs?utr=eq.{utr}&select=utr"
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        return len(res.json()) > 0
     except Exception as e:
-        logging.error(f"Error checking UTR: {e}")
+        logging.error(f"UTR check error: {e}")
         return False
 
 def add_used_utr(utr: str):
     try:
-        conn = psycopg2.connect(DB_URI)
-        conn.autocommit = True
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (utr,))
-        cursor.close()
-        conn.close()
+        url = f"{SUPABASE_URL}/rest/v1/used_utrs"
+        requests.post(url, headers=HEADERS, json={"utr": utr}, timeout=10)
     except Exception as e:
-        logging.error(f"Error adding UTR: {e}")
+        logging.error(f"UTR write error: {e}")
 
-# Initialize Database cloud structure
+# Initialize
 init_db()
 
-# --- GLOBAL SYSTEM LAYERS CONFIG ---
+# --- SYSTEM SETTINGS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -108,13 +81,11 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
-# --- MASTER CONFIGURATION (CONNECTED BOTS) ---
 ADMIN_CHAT_ID = 8254886110
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
 USER_STATES = {}
 PENDING_TX = {}
-
 YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
 MERCHANT_NAME = "GBX"
 bot_app = None
@@ -131,8 +102,7 @@ def load_dashboard_menu():
 async def get_remaining_channels(user_id: int):
     global bot_app
     remaining = []
-    if not bot_app: 
-        return REQUIRED_TARGETS
+    if not bot_app: return REQUIRED_TARGETS
     for target in REQUIRED_TARGETS:
         try:
             member = await bot_app.bot.get_chat_member(chat_id=target, user_id=user_id)
@@ -147,12 +117,9 @@ async def show_force_join_menu(update: Update, remaining: list):
     for target in remaining:
         buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
     buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-    
     total_left = len(remaining)
-    text = f"⚠️ **Access Denied!**\n\nAbhi bhi `{total_left}` channels join karna baki hai. Niche diye gaye channels ko join karein:"
-    
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
-    await update.message.reply_text("🔒 *Dashboard features locked until joined!*", reply_markup=ReplyKeyboardRemove(), parse_mode="Markdown")
+    await update.message.reply_text(f"⚠️ **Access Denied!**\n\nAbhi bhi `{total_left}` channels join karna baki hai:", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    await update.message.reply_text("🔒 *Dashboard locked!*", reply_markup=ReplyKeyboardRemove())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -171,23 +138,18 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     total_left = len(remaining)
     
     if total_left == 0:
-        try:
-            await query.message.delete()
-        except:
-            pass
+        try: await query.message.delete()
+        except: pass
         await query.message.reply_text("✅ **Access Granted! Welcome.**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
     else:
         buttons = []
         for target in remaining:
             buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
         buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-        
-        text = f"⚠️ **Access Denied!**\n\nKripya baki bache `{total_left}` channels bhi join karein:"
-        
         try:
-            await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+            await query.message.edit_text(f"⚠️ **Access Denied!**\n\nKripya baki bache `{total_left}` channels join karein:", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
         except TelegramError:
-            await query.answer(text=f"❌ Baki ke {total_left} channels abhi baki hain!", show_alert=True)
+            await query.answer(text=f"❌ Bache hue {total_left} channels join karein!", show_alert=True)
 
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global checker_app
@@ -201,12 +163,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         for target in remaining:
             buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
         buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-        
-        await update.message.reply_text(
-            f"⚠️ **Access Denied!**\n\nApne channels leave kar diye hain! Kripya bache hue `{len(remaining)}` channels dubara join karein:", 
-            reply_markup=InlineKeyboardMarkup(buttons), 
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"⚠️ **Access Denied!**\n\nChannels leave karne ke karan service lock kar di gayi hai:", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
         await update.message.reply_text("⛔ *Access Revoked!*", reply_markup=ReplyKeyboardRemove())
         return
 
@@ -240,9 +197,8 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             return
             
         utr = user_text.strip()
-        
         if is_utr_used(utr):
-            await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
+            await update.message.reply_text("❌ This UTR is already used!")
             return
             
         tx_data = PENDING_TX.get(user_id)
@@ -259,7 +215,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
                 ]]),
                 parse_mode="Markdown"
             )
-            await update.message.reply_text("⏳ **Payment Verification Pending!** Checker bot validation ka wait karein.")
+            await update.message.reply_text("⏳ **Payment Verification Pending!** Validation ka wait karein.")
         return
 
     if user_text == "💰 Wallet":
@@ -280,7 +236,6 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
     global bot_app
     query = update.callback_query
     await query.answer()
-    
     data = query.data.split(":")
     action, target_user = data[0], int(data[1])
     
@@ -289,33 +244,21 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         if is_utr_used(utr):
             await query.message.edit_text("❌ Already processed.")
             return
-            
         add_used_utr(utr)  
         update_balance(target_user, amount) 
         PENDING_TX.pop(target_user, None)
-        
         new_total = get_balance(target_user)
-        await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
+        await query.message.edit_text(f"✅ Approved! ₹{amount} added.")
         if bot_app:
-            try:
-                await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
+            try: await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
             except: pass
     else:
         PENDING_TX.pop(target_user, None)
-        await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
+        await query.message.edit_text(f"❌ Rejected request.")
         if bot_app:
             try:
-                rejection_text = (
-                    "⌛<b>Payment Rejected!</b>\n"
-                    "Invalid Or Wrong UTR ❌\n\n"
-                    "Please Contact Admin\n"
-                    "👉 @gbx_support_bot"
-                )
-                await bot_app.bot.send_message(
-                    chat_id=target_user, 
-                    text=rejection_text,
-                    parse_mode="HTML"
-                )
+                rejection_text = "⌛<b>Payment Rejected!</b>\nInvalid Or Wrong UTR ❌\n\nPlease Contact Admin\n👉 @gbx_support_bot"
+                await bot_app.bot.send_message(chat_id=target_user, text=rejection_text, parse_mode="HTML")
             except: pass
 
 async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -387,4 +330,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-        

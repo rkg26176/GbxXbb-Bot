@@ -30,7 +30,7 @@ TARGET_LABELS = {
 
 bot_app = None
 
-# STRICT 5-BUTTON MATRIX GENERATOR (Removed 'Home', added exactly what you requested)
+# TARGETED MATRIX GRID GENERATOR
 def load_dashboard_menu():
     MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
     return ReplyKeyboardMarkup([
@@ -65,7 +65,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verify_user_membership(update.effective_user.id):
         await show_force_join_menu(update)
         return
-    # Fresh message with absolute keyboard rendering to overwrite phone cache layout
     await update.message.reply_text(
         "✨ **Dashboard Active!**\n\nNiche diye gaye options ka upyog karein.", 
         reply_markup=load_dashboard_menu(), 
@@ -77,7 +76,6 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     if await verify_user_membership(query.from_user.id):
         await query.message.delete()
-        # Overwriting layout with fresh forced 5-button matrix payload
         await query.message.reply_text(
             "✅ **Access Granted! Welcome to GBX Dashboard.**", 
             reply_markup=load_dashboard_menu(), 
@@ -86,11 +84,10 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     else:
         await query.answer(text="❌ Saare channels aur GC join nahi kiye!", show_alert=True)
 
-# KEYBOARD BUTTON ROUTER & TEXT INTERCEPTOR ENGINE
+# KEYBOARD BUTTON ACTIONS
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     
-    # 1. Customer Care Link Generation Hook
     if user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(text="💬 Open Support Bot", url="https://t.me/gbx_support_bot")]
@@ -102,17 +99,14 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
         
-    # 2. Wallet Trigger
     elif user_text == "💰 Wallet":
         await update.message.reply_text("💳 **Your Wallet Balance:** `₹0.00` \n\n*(Payment dynamic operations active)*", parse_mode="Markdown")
         return
 
-    # 3. Rest of the operations menu routing logs
     elif user_text in ["📱 My Accounts", "➕ New Login"]:
         await update.message.reply_text(f"🚧 **{user_text}** framework setup active.", parse_mode="Markdown")
         return
 
-    # Dynamic fallback to keep the 5-button setup active on chat inputs
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,10 +172,13 @@ async def init_webhook_mode():
     if not TOKEN or not URL: return
 
     bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
+    
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
-    bot_app.add_handler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages)
+    
+    # FIXED: Wrapping filter text strictly under MessageHandler instances to bypass BaseHandler type errors
+    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages))
     
     await bot_app.initialize()
     await bot_app.start()
@@ -199,3 +196,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+    

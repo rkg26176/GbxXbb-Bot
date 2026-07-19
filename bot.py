@@ -18,64 +18,77 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 def init_db():
-    conn = psycopg2.connect(DB_URI)
-    cursor = conn.cursor()
-    # Permanent Table for Users Balance
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
-            balance REAL DEFAULT 0.0
-        )
-    ''')
-    # Permanent Table for Blocking Duplicate UTRs
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS used_utrs (
-            utr TEXT PRIMARY KEY
-        )
-    ''')
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn = psycopg2.connect(DB_URI)
+        conn.autocommit = True
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                balance REAL DEFAULT 0.0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS used_utrs (
+                utr TEXT PRIMARY KEY
+            )
+        ''')
+        cursor.close()
+        conn.close()
+        logging.info("Supabase database tables checked/created successfully.")
+    except Exception as e:
+        logging.error(f"Database initialization error: {e}")
 
 def get_balance(user_id: int) -> float:
-    conn = psycopg2.connect(DB_URI)
-    cursor = conn.cursor()
-    cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return row[0] if row else 0.0
+    try:
+        conn = psycopg2.connect(DB_URI)
+        cursor = conn.cursor()
+        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row[0] if row else 0.0
+    except Exception as e:
+        logging.error(f"Error getting balance: {e}")
+        return 0.0
 
 def update_balance(user_id: int, amount: float):
-    conn = psycopg2.connect(DB_URI)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO users (user_id, balance) VALUES(%s, %s)
-        ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
-    ''', (user_id, amount, amount))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn = psycopg2.connect(DB_URI)
+        conn.autocommit = True
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO users (user_id, balance) VALUES(%s, %s)
+            ON CONFLICT(user_id) DO UPDATE SET balance = users.balance + EXCLUDED.balance
+        ''', (user_id, amount, amount))
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logging.error(f"Error updating balance: {e}")
 
 def is_utr_used(utr: str) -> bool:
-    conn = psycopg2.connect(DB_URI)
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM used_utrs WHERE utr = %s", (utr,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return row is not None
+    try:
+        conn = psycopg2.connect(DB_URI)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM used_utrs WHERE utr = %s", (utr,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row is not None
+    except Exception as e:
+        logging.error(f"Error checking UTR: {e}")
+        return False
 
 def add_used_utr(utr: str):
-    conn = psycopg2.connect(DB_URI)
-    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s)", (utr,))
-        conn.commit()
-    except psycopg2.IntegrityError:
-        pass
-    cursor.close()
-    conn.close()
+        conn = psycopg2.connect(DB_URI)
+        conn.autocommit = True
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (utr,))
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logging.error(f"Error adding UTR: {e}")
 
 # Initialize Database cloud structure
 init_db()
@@ -249,7 +262,6 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
         if bot_app:
             try:
-                # Fixed HTML Clean Link Parsing
                 rejection_text = (
                     "⌛<b>Payment Rejected!</b>\n"
                     "Invalid Or Wrong UTR ❌\n\n"
@@ -320,4 +332,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-                    
+        

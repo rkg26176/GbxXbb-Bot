@@ -13,26 +13,23 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 # --- SUPABASE HTTP DIRECT ENGINE ---
 SUPABASE_URL = "https://zurfsqxesuoptiaumadh.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe" # Standard Direct Key format
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe")
 
-# Note: Using your Direct Reference Engine URL structure setup internally
 HEADERS = {
-    "apikey": os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe"),
-    "Authorization": f"Bearer {os.getenv('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1cmZzcXhlc3VvcHRpYXVtYWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5NjAwMDAsImV4cCI6MjAyNTkxNjAwMDB9.ExampleKeyPleaseKeepSafe')}",
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json",
     "Prefer": "return=representation"
 }
-
-def init_db():
-    # Structural updates automatically built via Supabase auto-expose layer
-    logging.info("Supabase live engine layer bound successfully.")
 
 def get_balance(user_id: int) -> float:
     try:
         url = f"{SUPABASE_URL}/rest/v1/users?user_id=eq.{user_id}&select=balance"
         res = requests.get(url, headers=HEADERS, timeout=10)
-        data = res.json()
-        return float(data[0]['balance']) if data else 0.0
+        if res.status_code == 200:
+            data = res.json()
+            return float(data[0]['balance']) if (data and 'balance' in data[0]) else 0.0
+        return 0.0
     except Exception as e:
         logging.error(f"Balance check error: {e}")
         return 0.0
@@ -51,7 +48,12 @@ def is_utr_used(utr: str) -> bool:
     try:
         url = f"{SUPABASE_URL}/rest/v1/used_utrs?utr=eq.{utr}&select=utr"
         res = requests.get(url, headers=HEADERS, timeout=10)
-        return len(res.json()) > 0
+        if res.status_code == 200:
+            data = res.json()
+            # Strict validation check: only return True if data actually contains the UTR list element
+            if isinstance(data, list) and len(data) > 0:
+                return True
+        return False
     except Exception as e:
         logging.error(f"UTR check error: {e}")
         return False
@@ -62,9 +64,6 @@ def add_used_utr(utr: str):
         requests.post(url, headers=HEADERS, json={"utr": utr}, timeout=10)
     except Exception as e:
         logging.error(f"UTR write error: {e}")
-
-# Initialize
-init_db()
 
 # --- SYSTEM SETTINGS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
@@ -198,7 +197,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             
         utr = user_text.strip()
         if is_utr_used(utr):
-            await update.message.reply_text("❌ This UTR is already used!")
+            await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
             return
             
         tx_data = PENDING_TX.get(user_id)
@@ -247,6 +246,7 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         add_used_utr(utr)  
         update_balance(target_user, amount) 
         PENDING_TX.pop(target_user, None)
+        
         new_total = get_balance(target_user)
         await query.message.edit_text(f"✅ Approved! ₹{amount} added.")
         if bot_app:
@@ -330,3 +330,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+                   

@@ -8,7 +8,7 @@ import re
 import psycopg2
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
@@ -112,7 +112,6 @@ TARGET_LABELS = {
 ADMIN_CHAT_ID = 8254886110
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
-# In-Memory Volatile States
 USER_STATES = {}
 PENDING_TX = {}
 
@@ -138,15 +137,11 @@ async def get_remaining_channels(user_id: int):
     for target in REQUIRED_TARGETS:
         try:
             member = await bot_app.bot.get_chat_member(chat_id=target, user_id=user_id)
-            if member.status in ['left', 'kicked']:
+            if member.status in ['left', 'kicked', 'restricted']:
                 remaining.append(target)
         except TelegramError:
             remaining.append(target)
     return remaining
-
-async def verify_user_membership(user_id: int) -> bool:
-    remaining = await get_remaining_channels(user_id)
-    return len(remaining) == 0
 
 async def show_force_join_menu(update: Update, remaining: list):
     buttons = []
@@ -157,7 +152,9 @@ async def show_force_join_menu(update: Update, remaining: list):
     total_left = len(remaining)
     text = f"⚠️ **Access Denied!**\n\nAbhi bhi `{total_left}` channels join karna baki hai. Niche diye gaye channels ko join karein:"
     
+    # 🚨 CRITICAL FIX: Destroys the bottom Reply Menu completely so user can't click dashboard buttons anymore!
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    await update.message.reply_text("🔒 *Dashboard features locked until joined!*", reply_markup=ReplyKeyboardRemove(), parse_mode="Markdown")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -191,6 +188,7 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         text = f"⚠️ **Access Denied!**\n\nKripya baki bache `{total_left}` channels bhi join karein:"
         
         try:
+            # Edit current text message to reflect only unjoined channels dynamically
             await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
         except TelegramError:
             await query.answer(text=f"❌ Baki ke {total_left} channels abhi baki hain!", show_alert=True)
@@ -200,12 +198,23 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     user_text = update.message.text
     
-    # 🚨 MASTER GATEKEEPER LAYER: Har button click par instant live check
+    # 🚨 HARD CORE GATEKEEPER CHECK ON ANY TEXT EVENT
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
-        # Clear any ongoing transaction state since they left a channel
         USER_STATES[user_id] = None
-        await show_force_join_menu(update, remaining)
+        # Block instantly and remove bottom layout completely
+        buttons = []
+        for target in remaining:
+            buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
+        buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
+        
+        await update.message.reply_text(
+            f"⚠️ **Access Denied!**\n\nApne channels leave kar diye hain! Kripya bache hue `{len(remaining)}` channels dubara join karein:", 
+            reply_markup=InlineKeyboardMarkup(buttons), 
+            parse_mode="Markdown"
+        )
+        # Force remove layout immediately
+        await update.message.reply_text("⛔ *Access Revoked!*", reply_markup=ReplyKeyboardRemove())
         return
 
     if user_text in ["📱 My Accounts", "➕ New Login", "💰 Wallet", "🛠️ Customer Care"]:
@@ -322,7 +331,6 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     await query.answer()
     
-    # 🚨 Also enforce live check when clicking Inline buttons like "Verify Payment"
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await query.message.delete()
@@ -331,6 +339,7 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
             buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
         buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
         await query.message.reply_text(f"⚠️ **Access Denied!**\nBache hue `{len(remaining)}` channels join karein.", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+        await query.message.reply_text("🔒 *Menu Locked!*", reply_markup=ReplyKeyboardRemove())
         return
 
     USER_STATES[user_id] = "AWAITING_UTR"
@@ -387,4 +396,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+        

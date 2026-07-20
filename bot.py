@@ -67,7 +67,6 @@ def update_balance(user_id: int, amount: float):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
         
@@ -84,7 +83,6 @@ def update_balance(user_id: int, amount: float):
         logging.error(f"Critical error updating balance for user {user_id}: {e}")
 
 def get_all_user_ids():
-    """Database se saare registered users ki IDs nikalne ke liye"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -180,8 +178,6 @@ async def show_force_join_menu(update: Update, remaining: list):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    
-    # User ko database me entry de do taaki broadcast me count ho sake
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -299,12 +295,11 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-# --- CHECKER BOT HANDLER (INCLUDES BROADCAST FEATURE) ---
+# --- ALL-MEDIA BROADCAST HANDLER ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
     
-    # Agar ye callback button hai (Accept/Reject)
     if query:
         await query.answer()
         data = query.data.split(":")
@@ -337,30 +332,32 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
                 except: pass
         return
 
-    # 📢 BROADCAST SYSTEM: Agar Admin ne Checker Bot par koi text message bheja hai
     message = update.message
     if message and message.from_user.id == ADMIN_CHAT_ID:
-        text_to_broadcast = message.text
-        
-        if text_to_broadcast.startswith("/"):
-            return # Agar koi command ho toh ignore karo
+        if message.text and message.text.startswith("/"):
+            return
 
         user_ids = get_all_user_ids()
         success_count = 0
         fail_count = 0
 
-        await message.reply_text(f"🚀 Broadcasting message to {len(user_ids)} users...")
+        status_msg = await message.reply_text(f"🚀 Broadcasting message to {len(user_ids)} users...")
 
         if bot_app:
             for uid in user_ids:
                 try:
-                    await bot_app.bot.send_message(chat_id=uid, text=text_to_broadcast)
+                    # Telegram Native Copy Message (Text, Photo, Video, Document sab exact copy karke bhejega)
+                    await bot_app.bot.copy_message(
+                        chat_id=uid,
+                        from_chat_id=message.chat_id,
+                        message_id=message.message_id
+                    )
                     success_count += 1
                 except Exception as e:
                     fail_count += 1
-                    logging.error(f"Failed to send broadcast to {uid}: {e}")
+                    logging.error(f"Broadcast failed for {uid}: {e}")
 
-            await message.reply_text(f"✅ **Broadcast Completed!**\n\n- Sent: {success_count}\n- Failed: {fail_count}")
+            await status_msg.edit_text(f"✅ **Broadcast Completed!**\n\n- Sent: {success_count}\n- Failed: {fail_count}")
 
 async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -406,8 +403,8 @@ async def init_webhook_mode():
 
     checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
-    # Checker bot par admin ke text message ko catch karne ke liye handler
-    checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & filters.User(user_id=ADMIN_CHAT_ID), checker_admin_action_handler))
+    # ALL MEDIA FILTER: Text + Photo + Document + Video sab capture karega
+    checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.User(user_id=ADMIN_CHAT_ID) & ~filters.COMMAND, checker_admin_action_handler))
     
     await checker_app.initialize()
     await checker_app.start()

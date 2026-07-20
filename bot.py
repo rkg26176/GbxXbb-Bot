@@ -5,7 +5,6 @@ import re
 import psycopg2
 import time
 import urllib.parse
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
@@ -17,10 +16,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # --- DATABASE LAYER ---
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
-def get_db_connection(retries=2):
+def get_db_connection(retries=3):
     for i in range(retries):
         try:
-            conn = psycopg2.connect(DB_URI, connect_timeout=8)
+            conn = psycopg2.connect(DB_URI, connect_timeout=10)
             conn.autocommit = True
             return conn
         except Exception as e:
@@ -47,7 +46,7 @@ def init_db():
         ''')
         cursor.close()
         conn.close()
-        logging.info("Supabase permanent tables verified successfully.")
+        logging.info("Database tables initialized successfully.")
     except Exception as e:
         logging.error(f"Database init error: {e}")
 
@@ -85,7 +84,7 @@ def update_balance(user_id: int, amount: float):
             
         cursor.close()
         conn.close()
-        logging.info(f"Balance committed for {user_id}: +{amount}")
+        logging.info(f"Balance updated for {user_id}: +{amount}")
     except Exception as e:
         logging.error(f"Error updating balance for {user_id}: {e}")
 
@@ -410,9 +409,22 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI SERVER & WEBHOOKS ---
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+# --- FASTAPI SERVER ---
+api_app = FastAPI()
+
+@api_app.get("/")
+def home():
+    return FileResponse("index.html")
+
+@api_app.get("/api/user-balance")
+def get_user_api_balance(user_id: int = 0):
+    if user_id > 0:
+        bal = get_balance(user_id)
+        return JSONResponse({"user_id": user_id, "balance": float(bal)})
+    return JSONResponse({"user_id": 0, "balance": 0.0})
+
+@api_app.on_event("startup")
+async def startup_event():
     global bot_app, checker_app
     TOKEN = os.getenv("BOT_TOKEN")
     URL = os.getenv("RENDER_EXTERNAL_URL")
@@ -420,7 +432,7 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
     except Exception as e:
-        logging.error(f"Database init warning: {e}")
+        logging.error(f"Init DB error: {e}")
 
     if TOKEN and URL:
         try:
@@ -433,9 +445,9 @@ async def lifespan(app: FastAPI):
             await bot_app.initialize()
             await bot_app.start()
             await bot_app.bot.set_webhook(url=f"{URL}/webhook")
-            logging.info("Main bot webhook ready.")
+            logging.info("Main bot webhook initialized.")
         except Exception as e:
-            logging.error(f"Error starting main bot: {e}")
+            logging.error(f"Bot init error: {e}")
 
         try:
             checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
@@ -445,32 +457,26 @@ async def lifespan(app: FastAPI):
             await checker_app.initialize()
             await checker_app.start()
             await checker_app.bot.set_webhook(url=f"{URL}/webhook/checker")
-            logging.info("Checker bot webhook ready.")
+            logging.info("Checker bot webhook initialized.")
         except Exception as e:
-            logging.error(f"Error starting checker bot: {e}")
-            
-    yield
-    logging.info("Shutting down app...")
+            logging.error(f"Checker bot init error: {e}")
 
-api_app = FastAPI(lifespan=lifespan)
+@api_app.post("/webhook")
+async def receive_telegram_update(request: Request):
+    global bot_app
+    if bot_app:
+        data = await request.json()
+        await bot_app.process_update(Update.de_json(data, bot_app.bot))
+    return Response(status_code=200)
 
-@api_app.get("/api/user-balance")
-def get_user_api_balance(request: Request, uid: int = 0, user_id: int = 0):
-    try:
-        target_id = uid if uid > 0 else user_id
-        if target_id == 0:
-            query_params = dict(request.query_params)
-            raw_str = str(query_params)
-            match = re.search(r'"id":\s*(\d+)', raw_str)
-            if match:
-                target_id = int(match.group(1))
+@api_app.post("/webhook/checker")
+async def receive_checker_update(request: Request):
+    global checker_app
+    if checker_app:
+        data = await request.json()
+        await checker_app.process_update(Update.de_json(data, checker_app.bot))
+    return Response(status_code=200)
 
-        if target_id > 0:
-            bal = get_balance(target_id)
-            return JSONResponse({"user_id": target_id, "balance": float(bal)})
-        return JSONResponse({"user_id": 0, "balance": 0.0})
-    except Exception as e:
-        logging.error(f"API balance endpoint error: {e}")
-        return JSONResponse({"user_id": 0, "balance": 0.0})
-
-@api_app
+if __name__ == "__main__":
+    import uvicorn
+    po

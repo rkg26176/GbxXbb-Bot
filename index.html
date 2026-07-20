@@ -515,31 +515,33 @@
 
     <script>
         const tg = window.Telegram.WebApp;
+        tg.ready();
         tg.expand();
 
-        let userId = null;
-
-        // Dynamic Telegram User ID extraction (No hardcoded admin ID fallback)
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-            userId = tg.initDataUnsafe.user.id;
+        function getUserTelegramId() {
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                return tg.initDataUnsafe.user.id;
+            }
+            return null;
         }
 
-        // Fetch Real-time Wallet Balance from FastAPI Backend for current active Telegram user
         async function fetchBotWalletBalance() {
-            if (!userId) {
-                document.getElementById('bot-wallet-balance').innerText = "Loading...";
+            const uid = getUserTelegramId();
+            if (!uid) {
+                // Retry if SDK initialization takes a fraction of a second
+                setTimeout(fetchBotWalletBalance, 300);
                 return;
             }
             try {
-                let response = await fetch(`/api/user-balance/${userId}`);
+                let response = await fetch(`/api/user-balance/${uid}`);
                 let data = await response.json();
                 document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
             } catch (e) {
                 console.error("Wallet Balance Load Error:", e);
+                document.getElementById('bot-wallet-balance').innerText = "₹0.00";
             }
         }
 
-        // Switch Tabs Functionality
         function switchTab(tabName) {
             document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active-page'));
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -552,13 +554,11 @@
             }
         }
 
-        // Add Money Button Handler: Closes Mini App & triggers bot payment flow
         function triggerBotAddBalance() {
             tg.sendData("ADD_BALANCE_TRIGGERED");
             tg.close();
         }
 
-        // Profile Modal Sheet Functions
         function openProfileModal() {
             document.getElementById('profile-modal').style.display = 'flex';
         }
@@ -573,7 +573,7 @@
             }
         }
 
-        // Initial Load
+        // Initial fetch
         fetchBotWalletBalance();
     </script>
 </body>

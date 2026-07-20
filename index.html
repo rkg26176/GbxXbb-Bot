@@ -506,12 +506,31 @@
         tg.ready();
         tg.expand();
 
+        let attempts = 0;
+
+        function getTelegramUserId() {
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                return tg.initDataUnsafe.user.id;
+            }
+            return null;
+        }
+
         async function fetchBotWalletBalance() {
-            // Extract Telegram initData string directly from SDK or location search
-            let rawData = tg.initData || window.location.search.substring(1);
+            const uid = getTelegramUserId();
+
+            if (!uid) {
+                if (attempts < 10) {
+                    attempts++;
+                    setTimeout(fetchBotWalletBalance, 300);
+                    return;
+                }
+                document.getElementById('bot-wallet-balance').innerText = "₹0.00";
+                return;
+            }
 
             try {
-                let response = await fetch(`/api/user-balance?${rawData}`);
+                // Pass direct uid query param
+                let response = await fetch(`/api/user-balance?uid=${uid}`);
                 let data = await response.json();
                 if (data && typeof data.balance === 'number') {
                     document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
@@ -519,7 +538,7 @@
                     document.getElementById('bot-wallet-balance').innerText = "₹0.00";
                 }
             } catch (e) {
-                console.error("Wallet Balance Fetch Error:", e);
+                console.error("Wallet Fetch Error:", e);
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";
             }
         }
@@ -555,9 +574,7 @@
             }
         }
 
-        // Fetch balance on initial load
         fetchBotWalletBalance();
     </script>
 </body>
-                            </html>
-                            
+</html>

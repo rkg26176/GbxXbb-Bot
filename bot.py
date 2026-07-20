@@ -53,7 +53,7 @@ def get_balance(user_id: int) -> float:
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
+        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (int(user_id),))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -68,14 +68,14 @@ def update_balance(user_id: int, amount: float):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
+        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (int(user_id),))
         row = cursor.fetchone()
         
         if row is not None:
             new_bal = float(row[0]) + amount
-            cursor.execute("UPDATE users SET balance = %s WHERE user_id = %s", (new_bal, user_id))
+            cursor.execute("UPDATE users SET balance = %s WHERE user_id = %s", (new_bal, int(user_id)))
         else:
-            cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, %s)", (user_id, amount))
+            cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, %s)", (int(user_id), amount))
             
         cursor.close()
         conn.close()
@@ -271,7 +271,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("❌ Numeric amount daalein.")
             return
 
-    # --- UTR INPUT HANDLER (STRICT & RESILIENT) ---
+    # --- UTR INPUT HANDLER ---
     elif USER_STATES.get(user_id) == "AWAITING_UTR" or re.match(r"^\d{12}$", user_text.strip()):
         utr = user_text.strip()
         if not re.match(r"^\d{12}$", utr):
@@ -283,7 +283,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             return
             
         tx_data = PENDING_TX.get(user_id)
-        amount = tx_data["amount"] if tx_data else 10.0  # Fallback default amount
+        amount = tx_data["amount"] if tx_data else 10.0
         USER_STATES[user_id] = None
         
         if checker_app:
@@ -402,11 +402,12 @@ api_app = FastAPI()
 @api_app.get("/api/user-balance/{user_id}")
 def get_user_api_balance(user_id: int):
     try:
-        bal = get_balance(int(user_id))
-        return JSONResponse({"user_id": int(user_id), "balance": float(bal)})
+        clean_uid = int(user_id)
+        bal = get_balance(clean_uid)
+        return JSONResponse({"user_id": clean_uid, "balance": float(bal)})
     except Exception as e:
         logging.error(f"API balance endpoint error for {user_id}: {e}")
-        return JSONResponse({"user_id": int(user_id), "balance": 0.0})
+        return JSONResponse({"user_id": 0, "balance": 0.0})
 
 @api_app.get("/")
 def home():
@@ -457,3 +458,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+    

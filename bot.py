@@ -20,20 +20,20 @@ DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-sout
 def get_db_connection(retries=3):
     for i in range(retries):
         try:
-            conn = psycopg2.connect(DB_URI, connect_timeout=15)
+            conn = psycopg2.connect(DB_URI, connect_timeout=10)
             conn.autocommit = True
             return conn
         except Exception as e:
             logging.error(f"Database connection attempt {i+1} failed: {e}")
             if i < retries - 1:
-                time.sleep(2)
+                time.sleep(1)
     return None
 
 def init_db():
     try:
         conn = get_db_connection()
         if not conn:
-            logging.error("Database connection could not be established during init.")
+            logging.error("Database connection could not be established for init_db.")
             return
         cursor = conn.cursor()
         cursor.execute('''
@@ -416,13 +416,12 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global bot_app, checker_app
-    
-    # Safe DB Initialization inside lifespan
-    init_db()
-
     TOKEN = os.getenv("BOT_TOKEN")
     URL = os.getenv("RENDER_EXTERNAL_URL")
     
+    # Initialize DB safely on startup
+    init_db()
+
     if TOKEN and URL:
         try:
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
@@ -475,4 +474,4 @@ async def receive_telegram_update(request: Request):
     global bot_app
     if bot_app:
         data = await request.json()
-        await bot_app.process_up
+        await bot_app.process_update(Update.

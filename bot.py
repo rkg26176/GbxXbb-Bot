@@ -419,7 +419,6 @@ async def lifespan(app: FastAPI):
     TOKEN = os.getenv("BOT_TOKEN")
     URL = os.getenv("RENDER_EXTERNAL_URL")
     
-    # Initialize DB safely on startup
     init_db()
 
     if TOKEN and URL:
@@ -474,4 +473,5 @@ async def receive_telegram_update(request: Request):
     global bot_app
     if bot_app:
         data = await request.json()
-        await bot_app.process_update(Update.
+        await bot_app.process_update(Update.de_json(data, bot_app.bot))
+    return

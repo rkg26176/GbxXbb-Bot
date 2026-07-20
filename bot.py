@@ -57,7 +57,7 @@ def get_balance(user_id: int) -> float:
         row = cursor.fetchone()
         cursor.close()
         conn.close()
-        if row is not None:
+        if row is not None and row[0] is not None:
             return float(row[0])
         return 0.0
     except Exception as e:
@@ -401,8 +401,12 @@ api_app = FastAPI()
 
 @api_app.get("/api/user-balance/{user_id}")
 def get_user_api_balance(user_id: int):
-    bal = get_balance(user_id)
-    return JSONResponse({"user_id": user_id, "balance": bal})
+    try:
+        bal = get_balance(int(user_id))
+        return JSONResponse({"user_id": int(user_id), "balance": float(bal)})
+    except Exception as e:
+        logging.error(f"API balance endpoint error for {user_id}: {e}")
+        return JSONResponse({"user_id": int(user_id), "balance": 0.0})
 
 @api_app.get("/")
 def home():
@@ -453,4 +457,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-    

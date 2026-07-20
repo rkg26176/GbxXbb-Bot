@@ -27,11 +27,14 @@ def get_db_connection(retries=3):
             logging.error(f"Database connection attempt {i+1} failed: {e}")
             if i < retries - 1:
                 time.sleep(2)
-    raise Exception("Could not connect to Supabase after retries.")
+    return None
 
 def init_db():
     try:
         conn = get_db_connection()
+        if not conn:
+            logging.error("Database connection could not be established during init.")
+            return
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -53,6 +56,8 @@ def init_db():
 def get_balance(user_id: int) -> float:
     try:
         conn = get_db_connection()
+        if not conn:
+            return 0.0
         cursor = conn.cursor()
         cursor.execute("SELECT balance FROM users WHERE user_id = %s", (int(user_id),))
         row = cursor.fetchone()
@@ -68,6 +73,8 @@ def get_balance(user_id: int) -> float:
 def update_balance(user_id: int, amount: float):
     try:
         conn = get_db_connection()
+        if not conn:
+            return
         cursor = conn.cursor()
         cursor.execute("SELECT balance FROM users WHERE user_id = %s", (int(user_id),))
         row = cursor.fetchone()
@@ -87,6 +94,8 @@ def update_balance(user_id: int, amount: float):
 def get_all_user_ids():
     try:
         conn = get_db_connection()
+        if not conn:
+            return []
         cursor = conn.cursor()
         cursor.execute("SELECT user_id FROM users")
         rows = cursor.fetchall()
@@ -100,6 +109,8 @@ def get_all_user_ids():
 def is_utr_used(utr: str) -> bool:
     try:
         conn = get_db_connection()
+        if not conn:
+            return False
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM used_utrs WHERE utr = %s", (str(utr).strip(),))
         row = cursor.fetchone()
@@ -113,6 +124,8 @@ def is_utr_used(utr: str) -> bool:
 def add_used_utr(utr: str):
     try:
         conn = get_db_connection()
+        if not conn:
+            return
         cursor = conn.cursor()
         cursor.execute("INSERT INTO used_utrs (utr) VALUES (%s) ON CONFLICT DO NOTHING", (str(utr).strip(),))
         cursor.close()
@@ -120,8 +133,6 @@ def add_used_utr(utr: str):
         logging.info(f"UTR {utr} registered permanently.")
     except Exception as e:
         logging.error(f"Error storing UTR {utr}: {e}")
-
-init_db()
 
 # --- CONFIGURATIONS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
@@ -183,10 +194,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, 0.0) ON CONFLICT (user_id) DO NOTHING", (user_id,))
-        cursor.close()
-        conn.close()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, 0.0) ON CONFLICT (user_id) DO NOTHING", (user_id,))
+            cursor.close()
+            conn.close()
     except Exception as e:
         logging.error(f"Error inserting user on start: {e}")
 
@@ -404,6 +416,10 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global bot_app, checker_app
+    
+    # Safe DB Initialization inside lifespan
+    init_db()
+
     TOKEN = os.getenv("BOT_TOKEN")
     URL = os.getenv("RENDER_EXTERNAL_URL")
     
@@ -459,15 +475,4 @@ async def receive_telegram_update(request: Request):
     global bot_app
     if bot_app:
         data = await request.json()
-        await bot_app.process_update(Update.de_json(data, bot_app.bot))
-    return Response(status_code=200)
-
-@api_app.post("/webhook/checker")
-async def receive_checker_update(request: Request):
-    global checker_app
-    if checker_app:
-        data = await request.json()
-        await checker_app.process_update(Update.de_json(data, checker_app.bot))
-    return Response(status_code=200)
-
-if __name__ ==
+        await bot_app.process_up

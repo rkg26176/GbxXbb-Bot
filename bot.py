@@ -402,19 +402,26 @@ api_app = FastAPI()
 @api_app.get("/api/user-balance")
 def get_user_api_balance(request: Request):
     try:
-        # Extract user_id directly from Telegram WebApp initData URL string
         query_params = dict(request.query_params)
         user_id = None
         
+        # Method 1: Check encoded JSON inside query string
         if "user" in query_params:
             user_json = urllib.parse.unquote(query_params["user"])
             match = re.search(r'"id":\s*(\d+)', user_json)
             if match:
                 user_id = int(match.group(1))
 
-        if not user_id and "tgWebAppStartParam" in query_params:
-            # Fallback parsing
-            match = re.search(r'"id":\s*(\d+)', str(query_params))
+        # Method 2: Direct ID parameter check
+        if not user_id and "id" in query_params:
+            try:
+                user_id = int(query_params["id"])
+            except: pass
+
+        # Method 3: Search raw query text
+        if not user_id:
+            raw_str = str(request.query_params)
+            match = re.search(r'"id":\s*(\d+)', raw_str)
             if match:
                 user_id = int(match.group(1))
 
@@ -424,7 +431,7 @@ def get_user_api_balance(request: Request):
         
         return JSONResponse({"user_id": 0, "balance": 0.0})
     except Exception as e:
-        logging.error(f"API balance endpoint parse error: {e}")
+        logging.error(f"API balance parsing error: {e}")
         return JSONResponse({"user_id": 0, "balance": 0.0})
 
 @api_app.get("/")
@@ -468,9 +475,4 @@ async def receive_telegram_update(request: Request):
 async def receive_checker_update(request: Request):
     global checker_app
     if checker_app:
-        data = await request.json()
-        await checker_app.process_update(Update.de_json(data, checker_app.bot))
-    return Response(status_code=200)
-
-if __name__ == "__main__":
-    import uvicor
+        data = await reque

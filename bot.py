@@ -399,14 +399,32 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- FASTAPI BACKEND ---
 api_app = FastAPI()
 
-@api_app.get("/api/user-balance/{user_id}")
-def get_user_api_balance(user_id: int):
+@api_app.get("/api/user-balance")
+def get_user_api_balance(request: Request):
     try:
-        clean_uid = int(user_id)
-        bal = get_balance(clean_uid)
-        return JSONResponse({"user_id": clean_uid, "balance": float(bal)})
+        # Extract user_id directly from Telegram WebApp initData URL string
+        query_params = dict(request.query_params)
+        user_id = None
+        
+        if "user" in query_params:
+            user_json = urllib.parse.unquote(query_params["user"])
+            match = re.search(r'"id":\s*(\d+)', user_json)
+            if match:
+                user_id = int(match.group(1))
+
+        if not user_id and "tgWebAppStartParam" in query_params:
+            # Fallback parsing
+            match = re.search(r'"id":\s*(\d+)', str(query_params))
+            if match:
+                user_id = int(match.group(1))
+
+        if user_id:
+            bal = get_balance(user_id)
+            return JSONResponse({"user_id": user_id, "balance": float(bal)})
+        
+        return JSONResponse({"user_id": 0, "balance": 0.0})
     except Exception as e:
-        logging.error(f"API balance endpoint error for {user_id}: {e}")
+        logging.error(f"API balance endpoint parse error: {e}")
         return JSONResponse({"user_id": 0, "balance": 0.0})
 
 @api_app.get("/")
@@ -455,7 +473,4 @@ async def receive_checker_update(request: Request):
     return Response(status_code=200)
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+    import uvicor

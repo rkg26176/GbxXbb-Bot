@@ -14,7 +14,7 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- MASTER SUPABASE NATIVE CONNECTION LAYER ---
+# --- DATABASE LAYER ---
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 def get_db_connection(retries=3):
@@ -123,7 +123,7 @@ def add_used_utr(utr: str):
 
 init_db()
 
-# --- SYSTEM CONFIGS ---
+# --- CONFIGURATIONS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -159,7 +159,8 @@ def load_dashboard_menu():
 async def get_remaining_channels(user_id: int):
     global bot_app
     remaining = []
-    if not bot_app: return REQUIRED_TARGETS
+    if not bot_app:
+        return REQUIRED_TARGETS
     for target in REQUIRED_TARGETS:
         try:
             member = await bot_app.bot.get_chat_member(chat_id=target, user_id=user_id)
@@ -186,7 +187,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, 0.0) ON CONFLICT (user_id) DO NOTHING", (user_id,))
         cursor.close()
         conn.close()
-    except: pass
+    except Exception as e:
+        logging.error(f"Error inserting user on start: {e}")
 
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
@@ -203,8 +205,10 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     total_left = len(remaining)
     
     if total_left == 0:
-        try: await query.message.delete()
-        except: pass
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
         await query.message.reply_text("✅ **Access Granted! Welcome.**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
     else:
         buttons = []
@@ -220,7 +224,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     global checker_app
     user_id = update.effective_user.id
     
-    # --- Telegram Mini App Trigger Handler ---
     if update.message.web_app_data:
         data = update.message.web_app_data.data
         if data == "ADD_BALANCE_TRIGGERED":
@@ -272,7 +275,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("❌ Numeric amount daalein.")
             return
 
-    # --- UTR INPUT HANDLER ---
     elif USER_STATES.get(user_id) == "AWAITING_UTR" or re.match(r"^\d{12}$", user_text.strip()):
         utr = user_text.strip()
         if not re.match(r"^\d{12}$", utr):
@@ -314,7 +316,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-# --- ALL-MEDIA BROADCAST HANDLER ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
@@ -340,7 +341,8 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
                 try: 
                     new_total = get_balance(target_user)
                     await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
-                except: pass
+                except Exception as e:
+                    logging.error(f"User notify error: {e}")
         else:
             PENDING_TX.pop(target_user, None)
             await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
@@ -348,7 +350,8 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
                 try:
                     rejection_text = "⌛<b>Payment Rejected!</b>\nInvalid Or Wrong UTR ❌\n\nPlease Contact Admin\n👉 @gbx_support_bot"
                     await bot_app.bot.send_message(chat_id=target_user, text=rejection_text, parse_mode="HTML")
-                except: pass
+                except Exception as e:
+                    logging.error(f"Rejection msg error: {e}")
         return
 
     message = update.message
@@ -397,7 +400,7 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI MODERN LIFESPAN MANAGER ---
+# --- FASTAPI SERVER & WEBHOOKS ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global bot_app, checker_app
@@ -415,7 +418,7 @@ async def lifespan(app: FastAPI):
             await bot_app.initialize()
             await bot_app.start()
             await bot_app.bot.set_webhook(url=f"{URL}/webhook")
-            logging.info("Main bot webhook initialized.")
+            logging.info("Main bot webhook ready.")
         except Exception as e:
             logging.error(f"Error starting main bot: {e}")
 
@@ -427,45 +430,44 @@ async def lifespan(app: FastAPI):
             await checker_app.initialize()
             await checker_app.start()
             await checker_app.bot.set_webhook(url=f"{URL}/webhook/checker")
-            logging.info("Checker bot webhook initialized.")
+            logging.info("Checker bot webhook ready.")
         except Exception as e:
             logging.error(f"Error starting checker bot: {e}")
             
     yield
-    logging.info("Shutting down application...")
+    logging.info("Shutting down app...")
 
-# --- FASTAPI BACKEND APP ---
 api_app = FastAPI(lifespan=lifespan)
 
 @api_app.get("/api/user-balance")
-def get_user_api_balance(request: Request):
+def get_user_api_balance(uid: int = 0):
     try:
-        query_params = dict(request.query_params)
-        user_id = None
-        
-        # Method 1: Check encoded JSON inside query string
-        if "user" in query_params:
-            user_json = urllib.parse.unquote(query_params["user"])
-            match = re.search(r'"id":\s*(\d+)', user_json)
-            if match:
-                user_id = int(match.group(1))
-
-        # Method 2: Direct ID parameter check
-        if not user_id and "id" in query_params:
-            try:
-                user_id = int(query_params["id"])
-            except: pass
-
-        # Method 3: Search raw query text
-        if not user_id:
-            raw_str = str(request.query_params)
-            match = re.search(r'"id":\s*(\d+)', raw_str)
-            if match:
-                user_id = int(match.group(1))
-
-        if user_id:
-            bal = get_balance(user_id)
-            return JSONResponse({"user_id": user_id, "balance": float(bal)})
-        
+        if uid > 0:
+            bal = get_balance(uid)
+            return JSONResponse({"user_id": uid, "balance": float(bal)})
         return JSONResponse({"user_id": 0, "balance": 0.0})
-    except
+    except Exception as e:
+        logging.error(f"API balance endpoint error: {e}")
+        return JSONResponse({"user_id": 0, "balance": 0.0})
+
+@api_app.get("/")
+def home():
+    return FileResponse("index.html")
+
+@api_app.post("/webhook")
+async def receive_telegram_update(request: Request):
+    global bot_app
+    if bot_app:
+        data = await request.json()
+        await bot_app.process_update(Update.de_json(data, bot_app.bot))
+    return Response(status_code=200)
+
+@api_app.post("/webhook/checker")
+async def receive_checker_update(request: Request):
+    global checker_app
+    if checker_app:
+        data = await request.json()
+        await checker_app.process_update(Update.de_json(data, checker_app.bot))
+    return Response(status_code=200)
+
+if __name__ ==

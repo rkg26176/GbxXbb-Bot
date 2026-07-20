@@ -5,6 +5,7 @@ import re
 import psycopg2
 import time
 import urllib.parse
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
@@ -396,8 +397,45 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI BACKEND ---
-api_app = FastAPI()
+# --- FASTAPI MODERN LIFESPAN MANAGER ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global bot_app, checker_app
+    TOKEN = os.getenv("BOT_TOKEN")
+    URL = os.getenv("RENDER_EXTERNAL_URL")
+    
+    if TOKEN and URL:
+        try:
+            bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
+            bot_app.add_handler(CommandHandler("start", start))
+            bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
+            bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
+            bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & (filters.TEXT | filters.StatusUpdate.WEB_APP_DATA) & ~filters.COMMAND, handle_text_messages))
+            
+            await bot_app.initialize()
+            await bot_app.start()
+            await bot_app.bot.set_webhook(url=f"{URL}/webhook")
+            logging.info("Main bot webhook initialized.")
+        except Exception as e:
+            logging.error(f"Error starting main bot: {e}")
+
+        try:
+            checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
+            checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
+            checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.User(user_id=ADMIN_CHAT_ID) & ~filters.COMMAND, checker_admin_action_handler))
+            
+            await checker_app.initialize()
+            await checker_app.start()
+            await checker_app.bot.set_webhook(url=f"{URL}/webhook/checker")
+            logging.info("Checker bot webhook initialized.")
+        except Exception as e:
+            logging.error(f"Error starting checker bot: {e}")
+            
+    yield
+    logging.info("Shutting down application...")
+
+# --- FASTAPI BACKEND APP ---
+api_app = FastAPI(lifespan=lifespan)
 
 @api_app.get("/api/user-balance")
 def get_user_api_balance(request: Request):
@@ -430,49 +468,4 @@ def get_user_api_balance(request: Request):
             return JSONResponse({"user_id": user_id, "balance": float(bal)})
         
         return JSONResponse({"user_id": 0, "balance": 0.0})
-    except Exception as e:
-        logging.error(f"API balance parsing error: {e}")
-        return JSONResponse({"user_id": 0, "balance": 0.0})
-
-@api_app.get("/")
-def home():
-    return FileResponse("index.html")
-
-@api_app.on_event("startup")
-async def init_webhook_mode():
-    global bot_app, checker_app
-    TOKEN = os.getenv("BOT_TOKEN")
-    URL = os.getenv("RENDER_EXTERNAL_URL")
-    if not TOKEN or not URL: return
-
-    bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
-    bot_app.add_handler(CommandHandler("start", start))
-    bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
-    bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & (filters.TEXT | filters.StatusUpdate.WEB_APP_DATA) & ~filters.COMMAND, handle_text_messages))
-    
-    await bot_app.initialize()
-    await bot_app.start()
-    await bot_app.bot.set_webhook(url=f"{URL}/webhook")
-
-    checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
-    checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
-    checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.User(user_id=ADMIN_CHAT_ID) & ~filters.COMMAND, checker_admin_action_handler))
-    
-    await checker_app.initialize()
-    await checker_app.start()
-    await checker_app.bot.set_webhook(url=f"{URL}/webhook/checker")
-
-@api_app.post("/webhook")
-async def receive_telegram_update(request: Request):
-    global bot_app
-    if bot_app:
-        data = await request.json()
-        await bot_app.process_update(Update.de_json(data, bot_app.bot))
-    return Response(status_code=200)
-
-@api_app.post("/webhook/checker")
-async def receive_checker_update(request: Request):
-    global checker_app
-    if checker_app:
-        data = await reque
+    except

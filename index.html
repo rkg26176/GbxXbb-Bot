@@ -518,24 +518,24 @@
         tg.ready();
         tg.expand();
 
-        let attempts = 0;
+        let retryCount = 0;
+
+        function extractUserId() {
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                return tg.initDataUnsafe.user.id;
+            }
+            return null;
+        }
 
         async function fetchBotWalletBalance() {
-            let uid = null;
-
-            // Extract exact active user ID from Telegram WebApp SDK
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                uid = tg.initDataUnsafe.user.id;
-            }
-
+            const uid = extractUserId();
+            
             if (!uid) {
-                // If SDK is still initializing, retry up to 10 times (2.5 seconds max)
-                if (attempts < 10) {
-                    attempts++;
-                    setTimeout(fetchBotWalletBalance, 250);
+                if (retryCount < 8) {
+                    retryCount++;
+                    setTimeout(fetchBotWalletBalance, 300);
                     return;
                 }
-                // Default to 0.00 if opened outside Telegram client
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";
                 return;
             }
@@ -549,7 +549,7 @@
                     document.getElementById('bot-wallet-balance').innerText = "₹0.00";
                 }
             } catch (e) {
-                console.error("Wallet Balance Load Error:", e);
+                console.error("Wallet Balance Fetch Error:", e);
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";
             }
         }
@@ -585,7 +585,7 @@
             }
         }
 
-        // Trigger balance load
+        // Fetch user balance on initialization
         fetchBotWalletBalance();
     </script>
 </body>

@@ -83,6 +83,20 @@ def update_balance(user_id: int, amount: float):
     except Exception as e:
         logging.error(f"Critical error updating balance for user {user_id}: {e}")
 
+def get_all_user_ids():
+    """Database se saare registered users ki IDs nikalne ke liye"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return [row[0] for row in rows]
+    except Exception as e:
+        logging.error(f"Error fetching all user IDs: {e}")
+        return []
+
 def is_utr_used(utr: str) -> bool:
     try:
         conn = get_db_connection()
@@ -124,7 +138,6 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
-# 🚨 UPDATED ADMIN CHAT ID HERE
 ADMIN_CHAT_ID = 8053042225
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
@@ -167,6 +180,16 @@ async def show_force_join_menu(update: Update, remaining: list):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
+    # User ko database me entry de do taaki broadcast me count ho sake
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, 0.0) ON CONFLICT (user_id) DO NOTHING", (user_id,))
+        cursor.close()
+        conn.close()
+    except: pass
+
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await show_force_join_menu(update, remaining)
@@ -276,38 +299,68 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
+# --- CHECKER BOT HANDLER (INCLUDES BROADCAST FEATURE) ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
-    await query.answer()
-    data = query.data.split(":")
-    action, target_user = data[0], int(data[1])
-    utr = data[3] if len(data) > 3 else "N/A"
     
-    if action == "adm_accept":
-        amount = float(data[2])
-        if is_utr_used(utr):
-            await query.message.edit_text(f"❌ Already processed for User `{target_user}`.")
-            return
-            
-        add_used_utr(utr)  
-        update_balance(target_user, amount) 
-        PENDING_TX.pop(target_user, None)
+    # Agar ye callback button hai (Accept/Reject)
+    if query:
+        await query.answer()
+        data = query.data.split(":")
+        action, target_user = data[0], int(data[1])
+        utr = data[3] if len(data) > 3 else "N/A"
         
-        await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
+        if action == "adm_accept":
+            amount = float(data[2])
+            if is_utr_used(utr):
+                await query.message.edit_text(f"❌ Already processed for User `{target_user}`.")
+                return
+                
+            add_used_utr(utr)  
+            update_balance(target_user, amount) 
+            PENDING_TX.pop(target_user, None)
+            
+            await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
+            if bot_app:
+                try: 
+                    new_total = get_balance(target_user)
+                    await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
+                except: pass
+        else:
+            PENDING_TX.pop(target_user, None)
+            await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
+            if bot_app:
+                try:
+                    rejection_text = "⌛<b>Payment Rejected!</b>\nInvalid Or Wrong UTR ❌\n\nPlease Contact Admin\n👉 @gbx_support_bot"
+                    await bot_app.bot.send_message(chat_id=target_user, text=rejection_text, parse_mode="HTML")
+                except: pass
+        return
+
+    # 📢 BROADCAST SYSTEM: Agar Admin ne Checker Bot par koi text message bheja hai
+    message = update.message
+    if message and message.from_user.id == ADMIN_CHAT_ID:
+        text_to_broadcast = message.text
+        
+        if text_to_broadcast.startswith("/"):
+            return # Agar koi command ho toh ignore karo
+
+        user_ids = get_all_user_ids()
+        success_count = 0
+        fail_count = 0
+
+        await message.reply_text(f"🚀 Broadcasting message to {len(user_ids)} users...")
+
         if bot_app:
-            try: 
-                new_total = get_balance(target_user)
-                await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
-            except: pass
-    else:
-        PENDING_TX.pop(target_user, None)
-        await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
-        if bot_app:
-            try:
-                rejection_text = "⌛<b>Payment Rejected!</b>\nInvalid Or Wrong UTR ❌\n\nPlease Contact Admin\n👉 @gbx_support_bot"
-                await bot_app.bot.send_message(chat_id=target_user, text=rejection_text, parse_mode="HTML")
-            except: pass
+            for uid in user_ids:
+                try:
+                    await bot_app.bot.send_message(chat_id=uid, text=text_to_broadcast)
+                    success_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    logging.error(f"Failed to send broadcast to {uid}: {e}")
+
+            await message.reply_text(f"✅ **Broadcast Completed!**\n\n- Sent: {success_count}\n- Failed: {fail_count}")
 
 async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -353,6 +406,8 @@ async def init_webhook_mode():
 
     checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
+    # Checker bot par admin ke text message ko catch karne ke liye handler
+    checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & filters.User(user_id=ADMIN_CHAT_ID), checker_admin_action_handler))
     
     await checker_app.initialize()
     await checker_app.start()

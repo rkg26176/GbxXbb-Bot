@@ -17,23 +17,21 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # --- DATABASE LAYER ---
 DB_URI = "postgresql://postgres.zurfsqxesuoptiaumadh:Rounakjjj1234@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
-def get_db_connection(retries=3):
+def get_db_connection(retries=2):
     for i in range(retries):
         try:
-            conn = psycopg2.connect(DB_URI, connect_timeout=10)
+            conn = psycopg2.connect(DB_URI, connect_timeout=8)
             conn.autocommit = True
             return conn
         except Exception as e:
             logging.error(f"Database connection attempt {i+1} failed: {e}")
-            if i < retries - 1:
-                time.sleep(1)
+            time.sleep(1)
     return None
 
 def init_db():
     try:
         conn = get_db_connection()
         if not conn:
-            logging.error("Database connection could not be established for init_db.")
             return
         cursor = conn.cursor()
         cursor.execute('''
@@ -87,9 +85,9 @@ def update_balance(user_id: int, amount: float):
             
         cursor.close()
         conn.close()
-        logging.info(f"Balance verified and committed for {user_id}: +{amount}")
+        logging.info(f"Balance committed for {user_id}: +{amount}")
     except Exception as e:
-        logging.error(f"Critical error updating balance for user {user_id}: {e}")
+        logging.error(f"Error updating balance for {user_id}: {e}")
 
 def get_all_user_ids():
     try:
@@ -134,7 +132,7 @@ def add_used_utr(utr: str):
     except Exception as e:
         logging.error(f"Error storing UTR {utr}: {e}")
 
-# --- CONFIGURATIONS ---
+# --- SYSTEM CONFIGS ---
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -457,22 +455,22 @@ async def lifespan(app: FastAPI):
 api_app = FastAPI(lifespan=lifespan)
 
 @api_app.get("/api/user-balance")
-def get_user_api_balance(uid: int = 0):
+def get_user_api_balance(request: Request, uid: int = 0, user_id: int = 0):
     try:
-        if uid > 0:
-            bal = get_balance(uid)
-            return JSONResponse({"user_id": uid, "balance": float(bal)})
+        target_id = uid if uid > 0 else user_id
+        if target_id == 0:
+            query_params = dict(request.query_params)
+            raw_str = str(query_params)
+            match = re.search(r'"id":\s*(\d+)', raw_str)
+            if match:
+                target_id = int(match.group(1))
+
+        if target_id > 0:
+            bal = get_balance(target_id)
+            return JSONResponse({"user_id": target_id, "balance": float(bal)})
         return JSONResponse({"user_id": 0, "balance": 0.0})
     except Exception as e:
         logging.error(f"API balance endpoint error: {e}")
         return JSONResponse({"user_id": 0, "balance": 0.0})
 
-@api_app.get("/")
-def home():
-    return FileResponse("index.html")
-
-@api_app.post("/webhook")
-async def receive_telegram_update(request: Request):
-    global bot_app
-    if bot_app:
-        data = await requ
+@api_app

@@ -68,16 +68,13 @@ def update_balance(user_id: int, amount: float):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check if user exists
         cursor.execute("SELECT balance FROM users WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
         
         if row is not None:
-            # User exists, update current balance directly
             new_bal = float(row[0]) + amount
             cursor.execute("UPDATE users SET balance = %s WHERE user_id = %s", (new_bal, user_id))
         else:
-            # User does not exist, insert dynamic new row mapping
             cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, %s)", (user_id, amount))
             
         cursor.close()
@@ -110,7 +107,6 @@ def add_used_utr(utr: str):
     except Exception as e:
         logging.error(f"Error storing UTR {utr}: {e}")
 
-# Trigger DB check
 init_db()
 
 # --- SYSTEM CONFIGS ---
@@ -128,7 +124,8 @@ TARGET_LABELS = {
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
-ADMIN_CHAT_ID = 8254886110
+# 🚨 UPDATED ADMIN CHAT ID HERE
+ADMIN_CHAT_ID = 8053042225
 CHECKER_BOT_TOKEN = "8962475784:AAHeXQ-AGXSiTLYlFwKJV-OUMEBR2tno9xA"
 
 USER_STATES = {}
@@ -381,4 +378,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-            
+        

@@ -1,316 +1,520 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBX BigBasket Store</title>
+    <title>BigBasket Store Mini App</title>
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        :root {
+            --bb-green: #84c225;
+            --bb-dark-green: #6aa31a;
+            --bb-light-bg: #e8f5e9;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
+
         body {
-            background-color: #f4f5f7;
-            color: #333;
-            padding: 12px;
-            padding-bottom: 30px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 70px;
         }
 
-        /* Top Header */
-        .header {
+        /* Top Header & Delivery Bar */
+        .top-header {
+            background: #d4edda;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #155724;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+        .top-header span.time {
+            font-weight: bold;
+        }
+
+        /* Search Section */
+        .search-wrap {
             background: #ffffff;
-            padding: 12px 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 10px 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h3 {
-            color: #84c225; /* BigBasket Green */
-            font-size: 18px;
-        }
-        .user-tag {
-            font-size: 13px;
-            font-weight: 600;
-            color: #555;
-        }
-
-        /* Wallet & Account Info Card */
-        .dashboard-card {
-            background: linear-gradient(135deg, #84c225, #6aa31a);
-            color: white;
-            padding: 15px;
-            border-radius: 12px;
-            margin-top: 12px;
-            box-shadow: 0 4px 8px rgba(132, 194, 37, 0.2);
-        }
-        .wallet-row {
+        .search-box {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 8px 12px;
+            gap: 8px;
+            border: 1px solid var(--border-color);
         }
-        .wallet-label {
-            font-size: 13px;
-            opacity: 0.9;
-        }
-        .wallet-amount {
-            font-size: 24px;
-            font-weight: bold;
-            margin-top: 4px;
-        }
-        .account-info {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            font-size: 12px;
-            display: flex;
-            justify-content: space-between;
+        .search-box input {
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 100%;
+            font-size: 14px;
+            color: #334155;
         }
 
-        /* Pincode Selector */
-        .pincode-container {
+        /* Categories Bar */
+        .categories-scroll {
             display: flex;
-            gap: 8px;
-            margin-top: 12px;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 12px 14px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            scrollbar-width: none;
         }
-        .pincode-container input {
-            flex: 1;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
+        .categories-scroll::-webkit-scrollbar {
+            display: none;
         }
-        .pincode-container button {
-            padding: 10px 16px;
-            background-color: #84c225;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
+        .cat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 55px;
             cursor: pointer;
         }
-
-        /* Search Bar */
-        .search-container {
-            margin-top: 10px;
+        .cat-icon {
+            width: 42px;
+            height: 42px;
+            background: #f8fafc;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            border: 1px solid var(--border-color);
         }
-        .search-container input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
+        .cat-item.active .cat-icon {
+            background: var(--bb-light-bg);
+            border-color: var(--bb-green);
+        }
+        .cat-label {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        /* Content Area */
+        .main-content {
+            padding: 14px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #0f172a;
         }
 
         /* Product Grid */
-        .grid-title {
-            margin-top: 18px;
-            margin-bottom: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #222;
-        }
         .product-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
         }
         .product-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 10px;
             padding: 10px;
-            text-align: center;
-            border: 1px solid #eee;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            border: 1px solid var(--border-color);
+            position: relative;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
-        .product-card img {
+        .discount-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: #ef4444;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            z-index: 2;
+        }
+        .product-img {
             width: 100%;
             height: 110px;
             object-fit: contain;
+            margin-bottom: 8px;
             border-radius: 6px;
         }
-        .product-title {
+        .product-brand {
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .product-name {
             font-size: 13px;
             font-weight: 600;
-            margin: 8px 0 4px 0;
-            color: #333;
-            text-align: left;
+            color: #1e293b;
+            margin: 2px 0 6px 0;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
-        .product-qty {
-            font-size: 11px;
-            color: #777;
-            text-align: left;
-            margin-bottom: 8px;
-        }
-        .product-footer {
+        .price-row {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
             margin-top: 6px;
         }
-        .product-price {
-            font-size: 15px;
-            font-weight: bold;
-            color: #111;
+        .price-box {
+            display: flex;
+            flex-direction: column;
+        }
+        .price-current {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .price-original {
+            font-size: 11px;
+            color: #94a3b8;
+            text-decoration: line-through;
         }
         .add-btn {
-            background-color: #84c225;
-            color: white;
-            border: none;
-            padding: 6px 12px;
+            background: #ffffff;
+            color: var(--bb-green);
+            border: 1px solid var(--bb-green);
+            padding: 4px 14px;
             border-radius: 6px;
+            font-weight: 700;
             font-size: 12px;
-            font-weight: bold;
             cursor: pointer;
+            transition: all 0.2s;
+        }
+        .add-btn:active {
+            background: var(--bb-green);
+            color: white;
+        }
+
+        /* Account / Profile Drawer */
+        .account-sheet {
+            background: #ffffff;
+            border-radius: 16px 16px 0 0;
+            padding: 16px;
+            margin-top: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+        }
+        .profile-card {
+            background: var(--bb-light-bg);
+            padding: 14px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .profile-avatar {
+            width: 44px;
+            height: 44px;
+            background: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .profile-info h4 {
+            font-size: 15px;
+            color: #1e293b;
+        }
+        .profile-info p {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .account-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .acc-tile {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .acc-tile-icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        .acc-tile-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .nav-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 8px;
+            font-size: 13px;
+            color: #334155;
+            font-weight: 500;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        /* Bottom Fixed Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0;
+            border-top: 1px solid var(--border-color);
+            z-index: 200;
+        }
+        .nav-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            font-size: 11px;
+            color: #64748b;
+            text-decoration: none;
+        }
+        .nav-tab.active {
+            color: var(--bb-green);
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <div class="header">
-        <h3>🛒 BigBasket Store</h3>
-        <span class="user-tag" id="user-name">👤 Loading...</span>
+    <!-- Top Header Bar -->
+    <div class="top-header">
+        <span>⚡ <span class="time">5 mins</span></span>
+        <span style="margin-left: auto;">📍 Ranchi, Jharkhand</span>
     </div>
 
-    <!-- Real-time Wallet & Account Status Card -->
-    <div class="dashboard-card">
-        <div class="wallet-row">
-            <div>
-                <div class="wallet-label">💰 Bot Wallet Balance</div>
-                <div class="wallet-amount" id="wallet-balance">₹0.00</div>
-            </div>
-            <button onclick="fetchUserBalance()" style="background: rgba(255,255,255,0.2); border:none; color:white; padding:6px 10px; border-radius:6px; font-size:12px;">🔄 Refresh</button>
-        </div>
-        <div class="account-info">
-            <span>Telegram ID: <b id="display-user-id">--</b></span>
-            <span>Status: <b style="color:#e0f2fe;">🟢 Connected</b></span>
+    <!-- Search Section -->
+    <div class="search-wrap">
+        <div class="search-box">
+            <span>🔍</span>
+            <input type="text" placeholder="Search for 'groceries, milk, tea'...">
         </div>
     </div>
 
-    <!-- Location / Pincode Bar -->
-    <div class="pincode-container">
-        <input type="text" id="pincode-input" placeholder="Enter Pincode (e.g. 834001)" maxlength="6">
-        <button onclick="setLocation()">Set</button>
+    <!-- Categories Scroll Bar -->
+    <div class="categories-scroll">
+        <div class="cat-item active">
+            <div class="cat-icon">🛒</div>
+            <div class="cat-label">All</div>
+        </div>
+        <div class="cat-item">
+            <div class="cat-icon">🥦</div>
+            <div class="cat-label">Fresh</div>
+        </div>
+        <div class="cat-item">
+            <div class="cat-icon">🎧</div>
+            <div class="cat-label">Electronics</div>
+        </div>
+        <div class="cat-item">
+            <div class="cat-icon">🎮</div>
+            <div class="cat-label">Game on</div>
+        </div>
+        <div class="cat-item">
+            <div class="cat-icon">🍯</div>
+            <div class="cat-label">Organic</div>
+        </div>
+        <div class="cat-item">
+            <div class="cat-icon">💊</div>
+            <div class="cat-label">Health</div>
+        </div>
+        <div class="cat-item">
+            <div class="cat-icon">🎁</div>
+            <div class="cat-label">Gifting</div>
+        </div>
     </div>
 
-    <!-- Search Bar -->
-    <div class="search-container">
-        <input type="text" id="search-input" placeholder="Search groceries, milk, fruits...">
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <div class="section-title">Bestsellers</div>
+
+        <!-- Product Grid -->
+        <div class="product-grid">
+
+            <div class="product-card">
+                <div class="discount-badge">62% OFF</div>
+                <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300" class="product-img" alt="Product">
+                <div>
+                    <div class="product-brand">BOAT</div>
+                    <div class="product-name">Wireless Earbuds Active ANC</div>
+                </div>
+                <div class="price-row">
+                    <div class="price-box">
+                        <span class="price-current">₹1,099</span>
+                        <span class="price-original">₹4,000</span>
+                    </div>
+                    <button class="add-btn">ADD</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="discount-badge">15% OFF</div>
+                <img src="https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300" class="product-img" alt="Product">
+                <div>
+                    <div class="product-brand">AMUL</div>
+                    <div class="product-name">Fresh Taaza Milk 1 Litre</div>
+                </div>
+                <div class="price-row">
+                    <div class="price-box">
+                        <span class="price-current">₹54</span>
+                        <span class="price-original">₹64</span>
+                    </div>
+                    <button class="add-btn">ADD</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="discount-badge">11% OFF</div>
+                <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=300" class="product-img" alt="Product">
+                <div>
+                    <div class="product-brand">FRESHO</div>
+                    <div class="product-name">Pure Cow Ghee 500ml</div>
+                </div>
+                <div class="price-row">
+                    <div class="price-box">
+                        <span class="price-current">₹803</span>
+                        <span class="price-original">₹899</span>
+                    </div>
+                    <button class="add-btn">ADD</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="discount-badge">3% OFF</div>
+                <img src="https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300" class="product-img" alt="Product">
+                <div>
+                    <div class="product-brand">ORGANIC TATTVA</div>
+                    <div class="product-name">Organic Mustard Oil 1L</div>
+                </div>
+                <div class="price-row">
+                    <div class="price-box">
+                        <span class="price-current">₹338</span>
+                        <span class="price-original">₹349</span>
+                    </div>
+                    <button class="add-btn">ADD</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- My Account Section / Sheet -->
+        <div class="account-sheet">
+            <div class="section-title">My Account</div>
+
+            <div class="profile-card">
+                <div class="profile-avatar">👤</div>
+                <div class="profile-info">
+                    <h4 id="user-display-name">Rounak Kumar</h4>
+                    <p id="user-display-id">ID: 8053042225</p>
+                </div>
+            </div>
+
+            <div class="account-grid">
+                <div class="acc-tile">
+                    <div class="acc-tile-icon">📦</div>
+                    <div class="acc-tile-label">Orders</div>
+                </div>
+                <div class="acc-tile">
+                    <div class="acc-tile-icon">💳</div>
+                    <div class="acc-tile-label" id="acc-wallet-bal">BBWallet ₹0.00</div>
+                </div>
+                <div class="acc-tile">
+                    <div class="acc-tile-icon">📍</div>
+                    <div class="acc-tile-label">Address</div>
+                </div>
+            </div>
+
+            <div class="nav-list">
+                <div class="nav-item"><span>🛍️</span> My orders</div>
+                <div class="nav-item"><span>🛒</span> View cart</div>
+                <div class="nav-item"><span>🔍</span> Search products</div>
+                <div class="nav-item"><span>💬</span> Support & FAQs</div>
+            </div>
+        </div>
     </div>
 
-    <!-- Store Products Grid -->
-    <div class="grid-title">🔥 Popular Products</div>
-    <div class="product-grid" id="product-list">
-        
-        <!-- Product 1 -->
-        <div class="product-card">
-            <img src="https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300" alt="Milk">
-            <div>
-                <div class="product-title">Fresh Full Cream Milk</div>
-                <div class="product-qty">500 ml</div>
-            </div>
-            <div class="product-footer">
-                <span class="product-price">₹33</span>
-                <button class="add-btn" onclick="addToCart('Fresh Full Cream Milk', 33)">ADD</button>
-            </div>
-        </div>
-
-        <!-- Product 2 -->
-        <div class="product-card">
-            <img src="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300" alt="Bread">
-            <div>
-                <div class="product-title">Brown Bread Large</div>
-                <div class="product-qty">400 g</div>
-            </div>
-            <div class="product-footer">
-                <span class="product-price">₹45</span>
-                <button class="add-btn" onclick="addToCart('Brown Bread Large', 45)">ADD</button>
-            </div>
-        </div>
-
-        <!-- Product 3 -->
-        <div class="product-card">
-            <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=300" alt="Butter">
-            <div>
-                <div class="product-title">Amul Pasteurized Butter</div>
-                <div class="product-qty">100 g</div>
-            </div>
-            <div class="product-footer">
-                <span class="product-price">₹56</span>
-                <button class="add-btn" onclick="addToCart('Amul Pasteurized Butter', 56)">ADD</button>
-            </div>
-        </div>
-
-        <!-- Product 4 -->
-        <div class="product-card">
-            <img src="https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300" alt="Banana">
-            <div>
-                <div class="product-title">Fresh Banana Robusta</div>
-                <div class="product-qty">1 kg (approx 6 pcs)</div>
-            </div>
-            <div class="product-footer">
-                <span class="product-price">₹40</span>
-                <button class="add-btn" onclick="addToCart('Fresh Banana Robusta', 40)">ADD</button>
-            </div>
-        </div>
-
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+        <a href="#" class="nav-tab active">
+            <span style="font-size:18px;">🏠</span>
+            <span>Home</span>
+        </a>
+        <a href="#" class="nav-tab">
+            <span style="font-size:18px;">📂</span>
+            <span>Categories</span>
+        </a>
+        <a href="#" class="nav-tab">
+            <span style="font-size:18px;">👛</span>
+            <span>Wallet</span>
+        </a>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let userId = 0;
+        let userId = 8053042225; // Default fallback
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            const user = tg.initDataUnsafe.user;
-            userId = user.id;
-            document.getElementById('user-name').innerText = "👤 " + user.first_name;
-            document.getElementById('display-user-id').innerText = userId;
-        } else {
-            // Testing Fallback Admin ID
-            userId = 8053042225;
-            document.getElementById('display-user-id').innerText = userId;
-            document.getElementById('user-name').innerText = "👤 Admin";
+            const u = tg.initDataUnsafe.user;
+            userId = u.id;
+            document.getElementById('user-display-name').innerText = u.first_name + (u.last_name ? " " + u.last_name : "");
+            document.getElementById('user-display-id').innerText = "ID: " + u.id;
         }
 
-        // Fetch Real Wallet Balance from FastAPI Backend
-        async function fetchUserBalance() {
+        async function loadWalletBalance() {
             try {
                 let response = await fetch(`/api/user-balance/${userId}`);
                 let data = await response.json();
-                document.getElementById('wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
+                document.getElementById('acc-wallet-bal').innerText = `BBWallet ₹${data.balance.toFixed(2)}`;
             } catch (e) {
-                console.error("Balance loading error:", e);
+                console.error("Wallet load error:", e);
             }
         }
 
-        function setLocation() {
-            const pincode = document.getElementById('pincode-input').value.trim();
-            if(pincode.length !== 6 || isNaN(pincode)) {
-                alert("Please enter a valid 6-digit Pincode!");
-                return;
-            }
-            alert("Pincode set to: " + pincode);
-        }
-
-        function addToCart(itemName, price) {
-            alert(itemName + " added to cart! Price: ₹" + price);
-        }
-
-        // Load balance when page opens
-        fetchUserBalance();
+        loadWalletBalance();
     </script>
 </body>
-                    </html>
-                    
+</html>

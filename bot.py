@@ -4,9 +4,9 @@ import random
 import re
 import psycopg2
 import time
-import urllib.parse  # 👈 URL ENCODING FIX FOR UPI QR
+import urllib.parse
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
@@ -244,7 +244,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             tx_ref = f"GBX{user_id}X{random.randint(1000, 9999)}"
             PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
             
-            # 🚀 FIXED UPI ENCODING (AMOUNT WILL NOW BE 100% FIXED IN ALL APPS)
             raw_upi_string = f"upi://pay?pa={YOUR_UPI_ID}&pn={MERCHANT_NAME}&am={amount:.2f}&cu=INR&tr={tx_ref}"
             encoded_upi_string = urllib.parse.quote(raw_upi_string)
             qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_upi_string}"
@@ -384,54 +383,114 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
+# --- FASTAPI BACKEND ---
 api_app = FastAPI()
 
-@api_app.get("/")
-def home(): return FileResponse("index.html")
+@api_app.get("/api/user-balance/{user_id}")
+def get_user_api_balance(user_id: int):
+    bal = get_balance(user_id)
+    return JSONResponse({"user_id": user_id, "balance": bal})
 
-@api_app.on_event("startup")
-async def init_webhook_mode():
-    global bot_app, checker_app
-    TOKEN = os.getenv("BOT_TOKEN")
-    URL = os.getenv("RENDER_EXTERNAL_URL")
-    if not TOKEN or not URL: return
+@api_app.get("/", response_class=HTMLResponse)
+def home():
+    # Stable Clean Mini App UI with Real Wallet Balance & Accounts Section
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="hi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GBX Store Dashboard</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 15px;
+                background-color: #0f172a;
+                color: #f8fafc;
+            }
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #334155;
+                padding-bottom: 12px;
+            }
+            .wallet-card {
+                background: linear-gradient(135deg, #1e293b, #334155);
+                border-radius: 12px;
+                padding: 16px;
+                margin-top: 15px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            }
+            .wallet-title {
+                font-size: 14px;
+                color: #94a3b8;
+            }
+            .wallet-balance {
+                font-size: 26px;
+                font-weight: bold;
+                color: #38bdf8;
+                margin-top: 5px;
+            }
+            .section-title {
+                font-size: 16px;
+                font-weight: bold;
+                margin-top: 25px;
+                margin-bottom: 10px;
+                color: #cbd5e1;
+            }
+            .accounts-box {
+                background: #1e293b;
+                border-radius: 10px;
+                padding: 12px;
+                border: 1px solid #334155;
+            }
+            .account-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px solid #334155;
+                font-size: 14px;
+            }
+            .account-item:last-child {
+                border-bottom: none;
+            }
+        </style>
+    </head>
+    <body>
 
-    bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
-    bot_app.add_handler(CommandHandler("start", start))
-    bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
-    bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages))
-    
-    await bot_app.initialize()
-    await bot_app.start()
-    await bot_app.bot.set_webhook(url=f"{URL}/webhook")
+        <div class="header">
+            <h3>⚡ GBX Terminal</h3>
+            <span id="user-name" style="font-size: 14px; color: #38bdf8;">Loading...</span>
+        </div>
 
-    checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
-    checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
-    checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.User(user_id=ADMIN_CHAT_ID) & ~filters.COMMAND, checker_admin_action_handler))
-    
-    await checker_app.initialize()
-    await checker_app.start()
-    await checker_app.bot.set_webhook(url=f"{URL}/webhook/checker")
+        <!-- Real Wallet Balance Card -->
+        <div class="wallet-card">
+            <div class="wallet-title">💳 Wallet Balance</div>
+            <div class="wallet-balance" id="wallet-balance">₹0.00</div>
+        </div>
 
-@api_app.post("/webhook")
-async def receive_telegram_update(request: Request):
-    global bot_app
-    if bot_app:
-        data = await request.json()
-        await bot_app.process_update(Update.de_json(data, bot_app.bot))
-    return Response(status_code=200)
+        <!-- My Accounts Section -->
+        <div class="section-title">📱 My Accounts & Logins</div>
+        <div class="accounts-box" id="accounts-container">
+            <div class="account-item">
+                <span>User ID:</span>
+                <span id="display-user-id" style="color: #cbd5e1;">--</span>
+            </div>
+            <div class="account-item">
+                <span>Status:</span>
+                <span style="color: #4ade80;">Active (Connected)</span>
+            </div>
+        </div>
 
-@api_app.post("/webhook/checker")
-async def receive_checker_update(request: Request):
-    global checker_app
-    if checker_app:
-        data = await request.json()
-        await checker_app.process_update(Update.de_json(data, checker_app.bot))
-    return Response(status_code=200)
+        <script>
+            const tg = window.Telegram.WebApp;
+            tg.expand();
 
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(api_app, host="0.0.0.0", port=port)
-    
+            let userId = 0;
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const user = tg.initDataUnsafe.user;
+                userId = user.id;
+                document.getElementById('user-name').i

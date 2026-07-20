@@ -6,8 +6,8 @@ import psycopg2
 import time
 import urllib.parse
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
+from fastapi.responses import JSONResponse
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
@@ -157,11 +157,10 @@ bot_app = None
 checker_app = None
 
 def load_dashboard_menu():
-    MINI_APP_URL = os.getenv("RENDER_EXTERNAL_URL", "https://gbxxbb-bot.onrender.com")
+    # Mini App button completely removed
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ New Login")],
-        [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Care")],
-        [KeyboardButton("🛒 Live BigBasket Store", web_app=WebAppInfo(url=MINI_APP_URL))]
+        [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Care")]
     ], resize_keyboard=True)
 
 async def get_remaining_channels(user_id: int):
@@ -233,14 +232,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     global checker_app
     user_id = update.effective_user.id
     
-    if update.message.web_app_data:
-        data = update.message.web_app_data.data
-        if data == "ADD_BALANCE_TRIGGERED":
-            USER_STATES[user_id] = "AWAITING_AMOUNT"
-            current_bal = get_balance(user_id)
-            await update.message.reply_text(f"💳 **Bot Balance:** `₹{current_bal:.2f}`\n📥 Enter amount to add in Wallet (Min ₹10):", parse_mode="Markdown")
-            return
-
     user_text = update.message.text
     if not user_text:
         return
@@ -314,14 +305,14 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     if user_text == "💰 Wallet":
         current_bal = get_balance(user_id)
         USER_STATES[user_id] = "AWAITING_AMOUNT"
-        await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount (Min ₹10):", parse_mode="Markdown")
+        await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount to deposit (Min ₹10):", parse_mode="Markdown")
     elif user_text == "🛠️ Customer Care":
-        await update.message.reply_text("Contact: @gbx_support_bot")
+        await update.message.reply_text("Contact Support: @gbx_support_bot")
     elif user_text == "📱 My Accounts":
         current_bal = get_balance(user_id)
-        await update.message.reply_text(f"🆔 ID: `{user_id}`\n💰 Balance: `₹{current_bal:.2f}`", parse_mode="Markdown")
+        await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n💰 **Wallet Balance:** `₹{current_bal:.2f}`\n\n📌 *No active linked sessions found.*", parse_mode="Markdown")
     elif user_text == "➕ New Login":
-        await update.message.reply_text("🚧 Terminal Interface Active.")
+        await update.message.reply_text("ℹ️ *Account Login feature currently unavailable.*", parse_mode="Markdown")
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
@@ -414,7 +405,7 @@ api_app = FastAPI()
 
 @api_app.get("/")
 def home():
-    return FileResponse("index.html")
+    return JSONResponse({"status": "ok", "service": "GBX Telegram Bot Server"})
 
 @api_app.get("/api/user-balance")
 def get_user_api_balance(user_id: int = 0):
@@ -440,7 +431,7 @@ async def startup_event():
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
             bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-            bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & (filters.TEXT | filters.StatusUpdate.WEB_APP_DATA) & ~filters.COMMAND, handle_text_messages))
+            bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages))
             
             await bot_app.initialize()
             await bot_app.start()
@@ -481,3 +472,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+            

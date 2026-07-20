@@ -229,7 +229,9 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             return
 
     user_text = update.message.text
-    
+    if not user_text:
+        return
+        
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         USER_STATES[user_id] = None
@@ -269,21 +271,22 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("❌ Numeric amount daalein.")
             return
 
-    elif USER_STATES.get(user_id) == "AWAITING_UTR":
-        if not re.match(r"^\d{12}$", user_text.strip()):
-            await update.message.reply_text("❌ 12-digit UTR daalein.")
-            return
-            
+    # --- UTR INPUT HANDLER (STRICT & RESILIENT) ---
+    elif USER_STATES.get(user_id) == "AWAITING_UTR" or re.match(r"^\d{12}$", user_text.strip()):
         utr = user_text.strip()
+        if not re.match(r"^\d{12}$", utr):
+            await update.message.reply_text("❌ Kripya sahi 12-digit ka UTR number bhejein.")
+            return
+
         if is_utr_used(utr):
             await update.message.reply_text("❌ This UTR is already used! Kripya sahi UTR enter karein.")
             return
             
         tx_data = PENDING_TX.get(user_id)
-        if tx_data and checker_app:
-            amount = tx_data["amount"]
-            USER_STATES[user_id] = None
-            
+        amount = tx_data["amount"] if tx_data else 10.0  # Fallback default amount
+        USER_STATES[user_id] = None
+        
+        if checker_app:
             await checker_app.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"📥 **New Deposit Alert!**\n👤 User ID: `{user_id}`\n💰 Amount: ₹{amount}\n🔢 UTR: `{utr}`",

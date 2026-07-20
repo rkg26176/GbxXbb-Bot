@@ -295,7 +295,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-# --- ALL-MEDIA BROADCAST HANDLER ---
+# --- PERFECT BROADCAST ENGINE ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
@@ -346,16 +346,29 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         if bot_app:
             for uid in user_ids:
                 try:
-                    # Telegram Native Copy Message (Text, Photo, Video, Document sab exact copy karke bhejega)
-                    await bot_app.bot.copy_message(
-                        chat_id=uid,
-                        from_chat_id=message.chat_id,
-                        message_id=message.message_id
-                    )
+                    # Photo message broadcasting
+                    if message.photo:
+                        photo_file_id = message.photo[-1].file_id
+                        caption_text = message.caption or ""
+                        await bot_app.bot.send_photo(chat_id=uid, photo=photo_file_id, caption=caption_text)
+                    # Video message broadcasting
+                    elif message.video:
+                        video_file_id = message.video.file_id
+                        caption_text = message.caption or ""
+                        await bot_app.bot.send_video(chat_id=uid, video=video_file_id, caption=caption_text)
+                    # Document / File broadcasting
+                    elif message.document:
+                        doc_file_id = message.document.file_id
+                        caption_text = message.caption or ""
+                        await bot_app.bot.send_document(chat_id=uid, document=doc_file_id, caption=caption_text)
+                    # Simple text message broadcasting
+                    elif message.text:
+                        await bot_app.bot.send_message(chat_id=uid, text=message.text)
+                        
                     success_count += 1
                 except Exception as e:
                     fail_count += 1
-                    logging.error(f"Broadcast failed for {uid}: {e}")
+                    logging.error(f"Broadcast failed for user {uid}: {e}")
 
             await status_msg.edit_text(f"✅ **Broadcast Completed!**\n\n- Sent: {success_count}\n- Failed: {fail_count}")
 
@@ -403,7 +416,6 @@ async def init_webhook_mode():
 
     checker_app = Application.builder().token(CHECKER_BOT_TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
     checker_app.add_handler(CallbackQueryHandler(checker_admin_action_handler, pattern="adm_.*"))
-    # ALL MEDIA FILTER: Text + Photo + Document + Video sab capture karega
     checker_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.User(user_id=ADMIN_CHAT_ID) & ~filters.COMMAND, checker_admin_action_handler))
     
     await checker_app.initialize()

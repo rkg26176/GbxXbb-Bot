@@ -4,109 +4,313 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBX BigBasket Store</title>
-    <!-- Telegram WebApp SDK Include Karein -->
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-style;
+        * {
+            box-sizing: border-box;
             margin: 0;
-            padding: 12px;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
+        body {
+            background-color: #f4f5f7;
+            color: #333;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+
+        /* Top Header */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
+            background: #ffffff;
+            padding: 12px 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .pincode-box {
+        .header h3 {
+            color: #84c225; /* BigBasket Green */
+            font-size: 18px;
+        }
+        .user-tag {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        /* Wallet & Account Info Card */
+        .dashboard-card {
+            background: linear-gradient(135deg, #84c225, #6aa31a);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 12px;
+            box-shadow: 0 4px 8px rgba(132, 194, 37, 0.2);
+        }
+        .wallet-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .wallet-label {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .wallet-amount {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+        .account-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Pincode Selector */
+        .pincode-container {
             display: flex;
             gap: 8px;
-            margin-top: 10px;
+            margin-top: 12px;
         }
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
+        .pincode-container input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
             font-size: 14px;
+            outline: none;
         }
-        button {
-            padding: 10px 15px;
-            background-color: #84c225; /* BigBasket Theme Color */
+        .pincode-container button {
+            padding: 10px 16px;
+            background-color: #84c225;
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-weight: bold;
             cursor: pointer;
         }
-        .search-box {
-            margin-top: 12px;
+
+        /* Search Bar */
+        .search-container {
+            margin-top: 10px;
+        }
+        .search-container input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        /* Product Grid */
+        .grid-title {
+            margin-top: 18px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #222;
         }
         .product-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-top: 15px;
         }
         .product-card {
-            border: 1px solid #eee;
-            border-radius: 8px;
+            background: white;
+            border-radius: 10px;
             padding: 10px;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .product-card img {
             width: 100%;
-            height: 100px;
+            height: 110px;
             object-fit: contain;
+            border-radius: 6px;
+        }
+        .product-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin: 8px 0 4px 0;
+            color: #333;
+            text-align: left;
+        }
+        .product-qty {
+            font-size: 11px;
+            color: #777;
+            text-align: left;
+            margin-bottom: 8px;
+        }
+        .product-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .product-price {
+            font-size: 15px;
+            font-weight: bold;
+            color: #111;
+        }
+        .add-btn {
+            background-color: #84c225;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
 
+    <!-- Header -->
     <div class="header">
-        <h2>🛒 GBX Store</h2>
-        <span id="user-name">Loading...</span>
+        <h3>🛒 BigBasket Store</h3>
+        <span class="user-tag" id="user-name">👤 Loading...</span>
     </div>
 
-    <!-- Pincode Selector -->
-    <div class="pincode-box">
-        <input type="text" id="pincode-input" placeholder="Apna Pincode Daalein (e.g. 834001)" maxlength="6">
+    <!-- Real-time Wallet & Account Status Card -->
+    <div class="dashboard-card">
+        <div class="wallet-row">
+            <div>
+                <div class="wallet-label">💰 Bot Wallet Balance</div>
+                <div class="wallet-amount" id="wallet-balance">₹0.00</div>
+            </div>
+            <button onclick="fetchUserBalance()" style="background: rgba(255,255,255,0.2); border:none; color:white; padding:6px 10px; border-radius:6px; font-size:12px;">🔄 Refresh</button>
+        </div>
+        <div class="account-info">
+            <span>Telegram ID: <b id="display-user-id">--</b></span>
+            <span>Status: <b style="color:#e0f2fe;">🟢 Connected</b></span>
+        </div>
+    </div>
+
+    <!-- Location / Pincode Bar -->
+    <div class="pincode-container">
+        <input type="text" id="pincode-input" placeholder="Enter Pincode (e.g. 834001)" maxlength="6">
         <button onclick="setLocation()">Set</button>
     </div>
 
-    <!-- Product Search Bar -->
-    <div class="search-box">
-        <input type="text" id="search-input" placeholder="Items Search Karein (e.g. Milk, Rice)...">
+    <!-- Search Bar -->
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Search groceries, milk, fruits...">
     </div>
 
-    <!-- Product Listing Container -->
+    <!-- Store Products Grid -->
+    <div class="grid-title">🔥 Popular Products</div>
     <div class="product-grid" id="product-list">
-        <p style="grid-column: span 2; text-align: center;">Pincode set karke search karein.</p>
+        
+        <!-- Product 1 -->
+        <div class="product-card">
+            <img src="https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300" alt="Milk">
+            <div>
+                <div class="product-title">Fresh Full Cream Milk</div>
+                <div class="product-qty">500 ml</div>
+            </div>
+            <div class="product-footer">
+                <span class="product-price">₹33</span>
+                <button class="add-btn" onclick="addToCart('Fresh Full Cream Milk', 33)">ADD</button>
+            </div>
+        </div>
+
+        <!-- Product 2 -->
+        <div class="product-card">
+            <img src="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300" alt="Bread">
+            <div>
+                <div class="product-title">Brown Bread Large</div>
+                <div class="product-qty">400 g</div>
+            </div>
+            <div class="product-footer">
+                <span class="product-price">₹45</span>
+                <button class="add-btn" onclick="addToCart('Brown Bread Large', 45)">ADD</button>
+            </div>
+        </div>
+
+        <!-- Product 3 -->
+        <div class="product-card">
+            <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=300" alt="Butter">
+            <div>
+                <div class="product-title">Amul Pasteurized Butter</div>
+                <div class="product-qty">100 g</div>
+            </div>
+            <div class="product-footer">
+                <span class="product-price">₹56</span>
+                <button class="add-btn" onclick="addToCart('Amul Pasteurized Butter', 56)">ADD</button>
+            </div>
+        </div>
+
+        <!-- Product 4 -->
+        <div class="product-card">
+            <img src="https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300" alt="Banana">
+            <div>
+                <div class="product-title">Fresh Banana Robusta</div>
+                <div class="product-qty">1 kg (approx 6 pcs)</div>
+            </div>
+            <div class="product-footer">
+                <span class="product-price">₹40</span>
+                <button class="add-btn" onclick="addToCart('Fresh Banana Robusta', 40)">ADD</button>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // Telegram WebApp Initialize
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Mini app ko full screen karna
+        tg.expand();
 
-        // User Info Load karna
+        let userId = 0;
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            document.getElementById('user-name').innerText = "👤 " + tg.initDataUnsafe.user.first_name;
+            const user = tg.initDataUnsafe.user;
+            userId = user.id;
+            document.getElementById('user-name').innerText = "👤 " + user.first_name;
+            document.getElementById('display-user-id').innerText = userId;
+        } else {
+            // Testing Fallback Admin ID
+            userId = 8053042225;
+            document.getElementById('display-user-id').innerText = userId;
+            document.getElementById('user-name').innerText = "👤 Admin";
+        }
+
+        // Fetch Real Wallet Balance from FastAPI Backend
+        async function fetchUserBalance() {
+            try {
+                let response = await fetch(`/api/user-balance/${userId}`);
+                let data = await response.json();
+                document.getElementById('wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
+            } catch (e) {
+                console.error("Balance loading error:", e);
+            }
         }
 
         function setLocation() {
-            const pincode = document.getElementById('pincode-input').value;
+            const pincode = document.getElementById('pincode-input').value.trim();
             if(pincode.length !== 6 || isNaN(pincode)) {
-                alert("Kripya sahi 6-digit Pincode enter karein!");
+                alert("Please enter a valid 6-digit Pincode!");
                 return;
             }
-            alert("Location set for Pincode: " + pincode);
-            // Agle step me yahan se backend fetch request jayegi
+            alert("Pincode set to: " + pincode);
         }
+
+        function addToCart(itemName, price) {
+            alert(itemName + " added to cart! Price: ₹" + price);
+        }
+
+        // Load balance when page opens
+        fetchUserBalance();
     </script>
 </body>
-</html>
+                    </html>
+                    

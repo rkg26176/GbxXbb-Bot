@@ -479,4 +479,5 @@ async def receive_checker_update(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    po
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(api_app, host="0.0.0.0", port=port)

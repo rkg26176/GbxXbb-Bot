@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBX BigBasket Store</title>
-    <!-- Telegram WebApp SDK -->
+    <!-- Telegram WebApp SDK Include -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -469,7 +469,7 @@
     <div id="page-wallet" class="tab-page">
         <div class="wallet-card">
             <div class="wallet-title">💳 GBX Bot Wallet Balance</div>
-            <div class="wallet-bal" id="bot-wallet-balance">Loading...</div>
+            <div class="wallet-bal" id="bot-wallet-balance">Fetching...</div>
             <button class="add-money-btn" onclick="triggerBotAddBalance()">➕ Add Money to Wallet</button>
         </div>
 
@@ -518,30 +518,12 @@
         tg.ready();
         tg.expand();
 
-        let retryCount = 0;
-
-        function extractUserId() {
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                return tg.initDataUnsafe.user.id;
-            }
-            return null;
-        }
-
         async function fetchBotWalletBalance() {
-            const uid = extractUserId();
+            // Get full Telegram initData query
+            const initData = tg.initData || "";
             
-            if (!uid) {
-                if (retryCount < 8) {
-                    retryCount++;
-                    setTimeout(fetchBotWalletBalance, 300);
-                    return;
-                }
-                document.getElementById('bot-wallet-balance').innerText = "₹0.00";
-                return;
-            }
-
             try {
-                let response = await fetch(`/api/user-balance/${uid}`);
+                let response = await fetch(`/api/user-balance?${initData}`);
                 let data = await response.json();
                 if (data && typeof data.balance === 'number') {
                     document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
@@ -585,7 +567,7 @@
             }
         }
 
-        // Fetch user balance on initialization
+        // Fetch user balance on startup
         fetchBotWalletBalance();
     </script>
 </body>

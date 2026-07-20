@@ -31,7 +31,7 @@
             padding-bottom: 70px;
         }
 
-        /* Top Header & Delivery Bar */
+        /* Top Header Bar */
         .top-header {
             background: #d4edda;
             padding: 10px 14px;
@@ -469,7 +469,7 @@
     <div id="page-wallet" class="tab-page">
         <div class="wallet-card">
             <div class="wallet-title">💳 GBX Bot Wallet Balance</div>
-            <div class="wallet-bal" id="bot-wallet-balance">₹0.00</div>
+            <div class="wallet-bal" id="bot-wallet-balance">Loading...</div>
             <button class="add-money-btn" onclick="triggerBotAddBalance()">➕ Add Money to Wallet</button>
         </div>
 
@@ -528,14 +528,18 @@
         async function fetchBotWalletBalance() {
             const uid = getUserTelegramId();
             if (!uid) {
-                // Retry if SDK initialization takes a fraction of a second
-                setTimeout(fetchBotWalletBalance, 300);
+                // Retry if Telegram WebApp SDK takes a moment to pass initData
+                setTimeout(fetchBotWalletBalance, 250);
                 return;
             }
             try {
                 let response = await fetch(`/api/user-balance/${uid}`);
                 let data = await response.json();
-                document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
+                if (data && typeof data.balance === 'number') {
+                    document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
+                } else {
+                    document.getElementById('bot-wallet-balance').innerText = "₹0.00";
+                }
             } catch (e) {
                 console.error("Wallet Balance Load Error:", e);
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";

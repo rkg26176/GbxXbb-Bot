@@ -218,6 +218,16 @@ async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global checker_app
     user_id = update.effective_user.id
+    
+    # --- Telegram Mini App Trigger Handler ---
+    if update.message.web_app_data:
+        data = update.message.web_app_data.data
+        if data == "ADD_BALANCE_TRIGGERED":
+            USER_STATES[user_id] = "AWAITING_AMOUNT"
+            current_bal = get_balance(user_id)
+            await update.message.reply_text(f"💳 **Bot Balance:** `₹{current_bal:.2f}`\n📥 Enter amount to add in Wallet (Min ₹10):", parse_mode="Markdown")
+            return
+
     user_text = update.message.text
     
     remaining = await get_remaining_channels(user_id)
@@ -406,7 +416,7 @@ async def init_webhook_mode():
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
     bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_text_messages))
+    bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & (filters.TEXT | filters.StatusUpdate.WEB_APP_DATA) & ~filters.COMMAND, handle_text_messages))
     
     await bot_app.initialize()
     await bot_app.start()
@@ -440,3 +450,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
+    

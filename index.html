@@ -517,9 +517,26 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let userId = 8053042225; // Default Admin Fallback
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        let userId = null;
+
+        // Dynamic Telegram User ID extraction (No hardcoded admin ID fallback)
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
             userId = tg.initDataUnsafe.user.id;
+        }
+
+        // Fetch Real-time Wallet Balance from FastAPI Backend for current active Telegram user
+        async function fetchBotWalletBalance() {
+            if (!userId) {
+                document.getElementById('bot-wallet-balance').innerText = "Loading...";
+                return;
+            }
+            try {
+                let response = await fetch(`/api/user-balance/${userId}`);
+                let data = await response.json();
+                document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
+            } catch (e) {
+                console.error("Wallet Balance Load Error:", e);
+            }
         }
 
         // Switch Tabs Functionality
@@ -532,17 +549,6 @@
 
             if (tabName === 'wallet') {
                 fetchBotWalletBalance();
-            }
-        }
-
-        // Fetch Real-time Wallet Balance from FastAPI Backend
-        async function fetchBotWalletBalance() {
-            try {
-                let response = await fetch(`/api/user-balance/${userId}`);
-                let data = await response.json();
-                document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
-            } catch (e) {
-                console.error("Wallet Balance Load Error:", e);
             }
         }
 

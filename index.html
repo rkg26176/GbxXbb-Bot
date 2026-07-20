@@ -1,281 +1,112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>bigbasket - Online Grocery</title>
+    <title>GBX BigBasket Store</title>
+    <!-- Telegram WebApp SDK Include Karein -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bb-green: #84c225;
-            --bb-dark-green: #0c3e19;
-            --bb-dark: #000000;
-            --bb-light-bg: #f5f6f7;
-            --bb-pill-bg: #eaf5d6;
-            --bb-pill-text: #4e820d;
+        body {
+            font-family: Arial, sans-style;
+            margin: 0;
+            padding: 12px;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
         }
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
-        body { margin: 0; padding: 0; background-color: var(--bb-light-bg); color: #333; overflow-x: hidden; padding-bottom: 120px; }
-        
-        /* Premium Header Shell */
-        .bb-sticky-header { position: sticky; top: 0; background: #c5e1a5; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
-        .delivery-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px 16px; }
-        .eta-badge { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 4px; color: var(--bb-dark); margin-bottom: 4px; }
-        
-        .location-dropdown-container { display: flex; align-items: center; gap: 6px; cursor: pointer; max-width: 80%; }
-        .location-icon { font-size: 16px; color: #000; }
-        .location-text-node { font-size: 14px; font-weight: 700; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .arrow-down-icon { font-size: 12px; color: #333; }
-
-        .profile-btn { width: 36px; height: 36px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--bb-dark-green); font-weight: 800; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-
-        /* Search Layout Container */
-        .search-container { padding: 4px 16px 12px 16px; display: flex; gap: 10px; align-items: center; background: #c5e1a5; }
-        .search-bar-inner { flex: 1; background: white; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-        .search-icon { color: #888; font-size: 16px; margin-right: 8px; }
-        .search-input { width: 100%; border: none; background: transparent; padding: 10px 0; font-size: 14px; outline: none; color: #222; }
-        .search-action-btn { background: var(--bb-dark-green); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
-
-        /* Horizontal Interactive Tabs */
-        .horizontal-tabs { display: flex; gap: 12px; overflow-x: auto; padding: 12px 16px; scrollbar-width: none; background: white; border-bottom: 1px solid #eef0f2; }
-        .horizontal-tabs::-webkit-scrollbar { display: none; }
-        .tab-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; min-width: 55px; opacity: 0.6; transition: all 0.2s; }
-        .tab-item.active { opacity: 1; }
-        .tab-icon-frame { width: 44px; height: 44px; background: #f5f6f8; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 1px solid transparent; }
-        .tab-item.active .tab-icon-frame { background: white; border-color: #ddd; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .tab-label { font-size: 11px; font-weight: 700; text-align: center; color: #222; }
-
-        /* Catalog Layout */
-        .promo-banner-space { padding: 12px 16px; background: white; display: block; }
-        .bb-fluid-banner { width: 100%; border-radius: 12px; display: block; object-fit: cover; }
-        .section-header-title { padding: 16px 16px 6px 16px; font-size: 16px; font-weight: 800; color: #000; display: flex; justify-content: space-between; align-items: center; }
-        .product-grid-container { padding: 0 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .bb-product-card { background: white; border-radius: 12px; padding: 12px; border: 1px solid #eef0f2; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
-        .discount-tag { position: absolute; top: 8px; left: 8px; background: #fdf0f0; color: #d93838; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
-        .card-media-wrapper { width: 100%; height: 110px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
-        .card-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .product-meta-brand { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #999; }
-        .product-meta-title { font-size: 13px; font-weight: 600; color: #222; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-        .product-meta-wgt { font-size: 11px; color: #777; margin-bottom: 8px; }
-        .card-footer-pricing { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #f5f6f7; padding-top: 8px; }
-        .actual-price { font-size: 15px; font-weight: 800; color: #000; }
-        .mrp-cross { font-size: 11px; color: #999; text-decoration: line-through; }
-
-        .add-action-box { width: 68px; height: 28px; }
-        .bb-ui-add-btn { width: 100%; height: 100%; background: white; color: #ff3f6c; border: 1px solid #ff3f6c; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: pointer; }
-
-        /* WALLET VIEW PANEL INTERFACE */
-        .wallet-panel-wrapper { display: none; padding: 20px 16px; }
-        .wallet-balance-card { background: linear-gradient(135deg, #0c3e19, #1b5e20); color: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 15px rgba(12,62,25,0.25); margin-bottom: 24px; }
-        .wallet-lbl { font-size: 13px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
-        .wallet-amount { font-size: 32px; font-weight: 900; margin-top: 8px; }
-        
-        .wallet-menu-list { background: white; border-radius: 12px; border: 1px solid #eef0f2; overflow: hidden; }
-        .wallet-menu-item { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid #f5f6f7; cursor: pointer; }
-        .wallet-menu-item:last-child { border: none; }
-        .wallet-item-icon { font-size: 20px; }
-        .wallet-item-text { font-size: 14px; font-weight: 700; color: #333; }
-        .wallet-item-arrow { margin-left: auto; color: #ccc; font-weight: bold; }
-
-        /* Bottom Navbar Layer Shell */
-        .app-bottom-navbar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eef0f2; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 0; z-index: 99999; box-shadow: 0 -2px 10px rgba(0,0,0,0.03); }
-        .nav-tab-node { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: #888; }
-        .nav-tab-node.active { color: var(--bb-green); }
-        
-        /* Floating Checkout Widgets */
-        .bottom-widgets-layer { position: fixed; bottom: 65px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px; pointer-events: none; z-index: 99999; }
-        .app-checkout-pill { background: var(--bb-dark-green); color: white; width: 100%; border-radius: 30px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
-        .checkout-pill-bill { font-size: 16px; font-weight: 800; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .pincode-box {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #84c225; /* BigBasket Theme Color */
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .search-box {
+            margin-top: 12px;
+        }
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .product-card {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .product-card img {
+            width: 100%;
+            height: 100px;
+            object-fit: contain;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Header Frame Shell -->
-    <div class="bb-sticky-header" id="header-shell">
-        <div class="delivery-row">
-            <div class="location-dropdown-container">
-                <span class="location-icon">📍</span>
-                <div>
-                    <div class="eta-badge">⚡ 5 mins</div>
-                    <div class="location-text-node">Ranchi, Jharkhand</div>
-                </div>
-            </div>
-            <!-- Top bar Profile icon opens wallet directly now -->
-            <div class="profile-btn" id="avatar-btn" onclick="switchNavTab('wallet')">R</div>
-        </div>
-        <div class="search-container">
-            <div class="search-bar-inner">
-                <span class="search-icon">🔍</span>
-                <input type="text" class="search-input" id="bb-search-box" placeholder="Search for products..." value="biscuit">
-            </div>
-            <button class="search-action-btn" onclick="executeAppSearch()">Search</button>
-        </div>
-        <div class="horizontal-tabs">
-            <div class="tab-item active" onclick="quickFilterCategory(this, 'biscuit')">
-                <div class="tab-icon-frame">🍪</div><div class="tab-label">Fresh</div>
-            </div>
-            <div class="tab-item" onclick="quickFilterCategory(this, 'milk')">
-                <div class="tab-icon-frame">🥛</div><div class="tab-label">Grocery</div>
-            </div>
-            <div class="tab-item" onclick="quickFilterCategory(this, 'chips')">
-                <div class="tab-icon-frame">🍟</div><div class="tab-label">Chips</div>
-            </div>
-            <div class="tab-item" onclick="quickFilterCategory(this, 'organic')">
-                <div class="tab-icon-frame">🥗</div><div class="tab-label">Organic</div>
-            </div>
-        </div>
+    <div class="header">
+        <h2>🛒 GBX Store</h2>
+        <span id="user-name">Loading...</span>
     </div>
 
-    <!-- VIEW 1: MAIN HOME VIEW -->
-    <div id="view-home">
-        <div class="promo-banner-space">
-            <img class="bb-fluid-banner" src="https://www.bigbasket.com/media/uploads/banner_images/hp_m_health_lifestyle_250523_460.jpg" alt="banner">
-        </div>
-        <div class="section-header-title">
-            <span>Bestsellers</span>
-        </div>
-        <div class="product-grid-container" id="catalog-grid-root"></div>
+    <!-- Pincode Selector -->
+    <div class="pincode-box">
+        <input type="text" id="pincode-input" placeholder="Apna Pincode Daalein (e.g. 834001)" maxlength="6">
+        <button onclick="setLocation()">Set</button>
     </div>
 
-    <!-- VIEW 2: DYNAMIC WALLET VIEW LAYER -->
-    <div id="view-wallet" class="wallet-panel-wrapper">
-        <div class="wallet-balance-card">
-            <div class="wallet-lbl">BigBasket Wallet Balance</div>
-            <div class="wallet-amount">₹500.00</div>
-        </div>
-        
-        <div class="wallet-menu-list">
-            <div class="wallet-menu-item">
-                <span class="wallet-item-icon">➕</span>
-                <span class="wallet-item-text">Add Money to Wallet</span>
-                <span class="wallet-item-arrow">›</span>
-            </div>
-            <div class="wallet-menu-item">
-                <span class="wallet-item-icon">📜</span>
-                <span class="wallet-item-text">Transaction History</span>
-                <span class="wallet-item-arrow">›</span>
-            </div>
-            <div class="wallet-menu-item">
-                <span class="wallet-item-icon">🎁</span>
-                <span class="wallet-item-text">Redeem Gift Card</span>
-                <span class="wallet-item-arrow">›</span>
-            </div>
-        </div>
+    <!-- Product Search Bar -->
+    <div class="search-box">
+        <input type="text" id="search-input" placeholder="Items Search Karein (e.g. Milk, Rice)...">
     </div>
 
-    <!-- Floating Checkout Widget Layer -->
-    <div class="bottom-widgets-layer" id="checkout-sheet-widget" style="display: none;">
-        <div class="app-checkout-pill" onclick="processFinalCheckout()">
-            <div>
-                <div class="checkout-pill-bill" id="checkout-total-val">₹0</div>
-                <div style="font-size:11px; opacity:0.8;" id="checkout-count-val">0 Items</div>
-            </div>
-            <div style="font-weight:700;">Place Order →</div>
-        </div>
-    </div>
-
-    <!-- Absolute Navigation Bottom Navbar Shell -->
-    <div class="app-bottom-navbar">
-        <div class="nav-tab-node active" id="nav-home-node" onclick="switchNavTab('home')">
-            <span style="font-size:18px;">🏠</span><div style="font-size:10px; font-weight:700;">Home</div>
-        </div>
-        <div class="nav-tab-node" id="nav-cat-node" onclick="switchNavTab('categories')">
-            <span style="font-size:18px;">🗂️</span><div style="font-size:10px; font-weight:700;">Categories</div>
-        </div>
-        <!-- Right corner changes to Wallet Now -->
-        <div class="nav-tab-node" id="nav-wallet-node" onclick="switchNavTab('wallet')">
-            <span style="font-size:18px;">💰</span><div style="font-size:10px; font-weight:700;">Wallet</div>
-        </div>
+    <!-- Product Listing Container -->
+    <div class="product-grid" id="product-list">
+        <p style="grid-column: span 2; text-align: center;">Pincode set karke search karein.</p>
     </div>
 
     <script>
+        // Telegram WebApp Initialize
         const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+        tg.expand(); // Mini app ko full screen karna
 
-        let applicationCart = {};
-        let localizedBillSum = 0;
-
+        // User Info Load karna
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            const runtimeUser = tg.initDataUnsafe.user;
-            if(runtimeUser.first_name) {
-                document.getElementById('avatar-btn').innerText = runtimeUser.first_name.charAt(0).toUpperCase();
+            document.getElementById('user-name').innerText = "👤 " + tg.initDataUnsafe.user.first_name;
+        }
+
+        function setLocation() {
+            const pincode = document.getElementById('pincode-input').value;
+            if(pincode.length !== 6 || isNaN(pincode)) {
+                alert("Kripya sahi 6-digit Pincode enter karein!");
+                return;
             }
+            alert("Location set for Pincode: " + pincode);
+            // Agle step me yahan se backend fetch request jayegi
         }
-
-        function switchNavTab(targetTab) {
-            document.querySelectorAll('.nav-tab-node').forEach(n => n.classList.remove('active'));
-            
-            if(targetTab === 'home') {
-                document.getElementById('nav-home-node').classList.add('active');
-                document.getElementById('header-shell').style.display = 'block';
-                document.getElementById('view-home').style.display = 'block';
-                document.getElementById('view-wallet').style.display = 'none';
-            } else if(targetTab === 'wallet') {
-                document.getElementById('nav-wallet-node').classList.add('active');
-                document.getElementById('header-shell').style.display = 'block';
-                document.getElementById('view-home').style.display = 'none';
-                document.getElementById('view-wallet').style.display = 'block';
-            } else if(targetTab === 'categories') {
-                document.getElementById('nav-cat-node').classList.add('active');
-                switchNavTab('home');
-            }
-        }
-
-        function quickFilterCategory(elem, key) {
-            document.querySelectorAll('.tab-item').forEach(i => i.classList.remove('active'));
-            elem.classList.add('active');
-            document.getElementById('bb-search-box').value = key;
-            executeAppSearch();
-        }
-
-        async function executeAppSearch() {
-            const root = document.getElementById('catalog-grid-root');
-            root.innerHTML = '';
-            const mockData = [
-                {"title": "Cadbury Dairy Milk Chocolate", "price": 20, "image": "https://www.bigbasket.com/media/uploads/p/l/20004554_7-cadbury-dairy-milk-chocolate-bar.jpg", "wgt": "20.2 g"},
-                {"title": "Bonn Premium White Bread Large", "price": 30, "image": "https://www.bigbasket.com/media/uploads/p/l/40001374_7-bonn-premium-white-bread.jpg", "wgt": "400 g"},
-                {"title": "Sunfeast Dark Fantasy Choco Fills", "price": 40, "image": "https://www.bigbasket.com/media/uploads/p/l/40003154_6-sunfeast-dark-fantasy-choco-fills.jpg", "wgt": "75 g"}
-            ];
-
-            mockData.forEach((prod, i) => {
-                const card = document.createElement('div');
-                card.className = 'bb-product-card';
-                card.innerHTML = `
-                    <div class="discount-tag">15% OFF</div>
-                    <div class="card-media-wrapper"><img class="card-img" src="${prod.image}"></div>
-                    <div class="product-meta-brand">BB Certified</div>
-                    <div class="product-meta-title">${prod.title}</div>
-                    <div class="product-meta-wgt">${prod.wgt}</div>
-                    <div class="card-footer-pricing">
-                        <div><span class="actual-price">₹${prod.price}</span></div>
-                        <div class="add-action-box">
-                            <button class="bb-ui-add-btn" onclick="cartAdd(${i},'${prod.title}',${prod.price})">Add</button>
-                        </div>
-                    </div>
-                `;
-                root.appendChild(card);
-            });
-        }
-
-        function cartAdd(i, title, price) {
-            applicationCart[i] = { title, price, qty: 1 };
-            localizedBillSum = price;
-            document.getElementById('checkout-sheet-widget').style.display = 'flex';
-            document.getElementById('checkout-total-val').innerText = `₹${localizedBillSum}`;
-            document.getElementById('checkout-count-val').innerText = `1 Item added`;
-        }
-
-        function processFinalCheckout() {
-            const txCode = "BB" + Math.floor(400000 + Math.random() * 590000);
-            const wireString = `TX_REF:${txCode}^FINAL_AMT:₹${localizedBillSum}^LOC:Ranchi, Jharkhand`;
-            tg.sendData(wireString);
-            tg.close();
-        }
-
-        window.onload = function() {
-            executeAppSearch();
-        };
     </script>
 </body>
 </html>

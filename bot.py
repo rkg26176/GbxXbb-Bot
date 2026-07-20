@@ -4,6 +4,7 @@ import random
 import re
 import psycopg2
 import time
+import urllib.parse  # 👈 URL ENCODING FIX FOR UPI QR
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
@@ -243,9 +244,14 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             tx_ref = f"GBX{user_id}X{random.randint(1000, 9999)}"
             PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
             
+            # 🚀 FIXED UPI ENCODING (AMOUNT WILL NOW BE 100% FIXED IN ALL APPS)
+            raw_upi_string = f"upi://pay?pa={YOUR_UPI_ID}&pn={MERCHANT_NAME}&am={amount:.2f}&cu=INR&tr={tx_ref}"
+            encoded_upi_string = urllib.parse.quote(raw_upi_string)
+            qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_upi_string}"
+            
             verify_btn = InlineKeyboardMarkup([[InlineKeyboardButton(text="🔄 Verify Payment (Enter UTR)", callback_data=f"ask_utr:{amount}")]])
             await update.message.reply_photo(
-                photo=f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa={YOUR_UPI_ID}&pn={MERCHANT_NAME}&am={amount}&tr={tx_ref}",
+                photo=qr_code_url,
                 caption=f"📲 Pay ₹{amount:.2f}\n⚠️ *Payment karke niche button par UTR daalein.*",
                 reply_markup=verify_btn
             )
@@ -295,7 +301,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-# --- PERFECT BROADCAST ENGINE ---
+# --- ALL-MEDIA BROADCAST HANDLER ---
 async def checker_admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
     query = update.callback_query
@@ -346,29 +352,15 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
         if bot_app:
             for uid in user_ids:
                 try:
-                    # Photo message broadcasting
-                    if message.photo:
-                        photo_file_id = message.photo[-1].file_id
-                        caption_text = message.caption or ""
-                        await bot_app.bot.send_photo(chat_id=uid, photo=photo_file_id, caption=caption_text)
-                    # Video message broadcasting
-                    elif message.video:
-                        video_file_id = message.video.file_id
-                        caption_text = message.caption or ""
-                        await bot_app.bot.send_video(chat_id=uid, video=video_file_id, caption=caption_text)
-                    # Document / File broadcasting
-                    elif message.document:
-                        doc_file_id = message.document.file_id
-                        caption_text = message.caption or ""
-                        await bot_app.bot.send_document(chat_id=uid, document=doc_file_id, caption=caption_text)
-                    # Simple text message broadcasting
-                    elif message.text:
-                        await bot_app.bot.send_message(chat_id=uid, text=message.text)
-                        
+                    await bot_app.bot.copy_message(
+                        chat_id=uid,
+                        from_chat_id=message.chat_id,
+                        message_id=message.message_id
+                    )
                     success_count += 1
                 except Exception as e:
                     fail_count += 1
-                    logging.error(f"Broadcast failed for user {uid}: {e}")
+                    logging.error(f"Broadcast failed for {uid}: {e}")
 
             await status_msg.edit_text(f"✅ **Broadcast Completed!**\n\n- Sent: {success_count}\n- Failed: {fail_count}")
 
@@ -442,4 +434,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-        
+    

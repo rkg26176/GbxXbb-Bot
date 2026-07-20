@@ -508,7 +508,7 @@
 
         let attempts = 0;
 
-        function getTelegramUserId() {
+        function extractUserId() {
             if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                 return tg.initDataUnsafe.user.id;
             }
@@ -516,12 +516,12 @@
         }
 
         async function fetchBotWalletBalance() {
-            const uid = getTelegramUserId();
+            const uid = extractUserId();
 
             if (!uid) {
                 if (attempts < 10) {
                     attempts++;
-                    setTimeout(fetchBotWalletBalance, 300);
+                    setTimeout(fetchBotWalletBalance, 250);
                     return;
                 }
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";
@@ -529,8 +529,8 @@
             }
 
             try {
-                // Pass direct uid query param
-                let response = await fetch(`/api/user-balance?uid=${uid}`);
+                // Pass both parameter options to ensure API catches it
+                let response = await fetch(`/api/user-balance?uid=${uid}&user_id=${uid}`);
                 let data = await response.json();
                 if (data && typeof data.balance === 'number') {
                     document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;

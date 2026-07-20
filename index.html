@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GBX BigBasket Store</title>
-    <!-- Telegram WebApp SDK Include -->
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -31,7 +31,6 @@
             padding-bottom: 70px;
         }
 
-        /* Top Header Bar */
         .top-header {
             background: #d4edda;
             padding: 10px 14px;
@@ -61,7 +60,6 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        /* Search Section */
         .search-wrap {
             background: #ffffff;
             padding: 10px 14px;
@@ -88,7 +86,6 @@
             color: #334155;
         }
 
-        /* Categories Scroll Bar */
         .categories-scroll {
             display: flex;
             gap: 12px;
@@ -130,7 +127,6 @@
             font-weight: 500;
         }
 
-        /* Pages View Handler */
         .tab-page {
             display: none;
             padding: 14px;
@@ -146,7 +142,6 @@
             color: #0f172a;
         }
 
-        /* Product Grid */
         .product-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -229,7 +224,6 @@
             cursor: pointer;
         }
 
-        /* Wallet Page Design */
         .wallet-card {
             background: linear-gradient(135deg, #84c225, #5f9311);
             color: white;
@@ -273,7 +267,6 @@
             padding: 20px 0;
         }
 
-        /* Profile Sheet Modal */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -312,7 +305,6 @@
             cursor: pointer;
         }
 
-        /* Bottom Fixed Navigation */
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -343,7 +335,6 @@
 </head>
 <body>
 
-    <!-- Top Header Bar -->
     <div class="top-header">
         <div class="location-text">
             <span>⚡ <b>5 mins</b></span>
@@ -352,7 +343,6 @@
         <div class="profile-btn" onclick="openProfileModal()">👤</div>
     </div>
 
-    <!-- Search Section -->
     <div class="search-wrap">
         <div class="search-box">
             <span>🔍</span>
@@ -362,7 +352,6 @@
 
     <!-- TAB 1: HOME PAGE -->
     <div id="page-home" class="tab-page active-page">
-        <!-- Categories Scroll Bar -->
         <div class="categories-scroll">
             <div class="cat-item active"><div class="cat-icon">🛒</div><div class="cat-label">All</div></div>
             <div class="cat-item"><div class="cat-icon">🥦</div><div class="cat-label">Fresh</div></div>
@@ -374,7 +363,6 @@
 
         <div class="section-title" style="margin-top: 14px;">🔥 Bestsellers</div>
 
-        <!-- Product Grid -->
         <div class="product-grid">
             <div class="product-card">
                 <div class="discount-badge">62% OFF</div>
@@ -519,11 +507,11 @@
         tg.expand();
 
         async function fetchBotWalletBalance() {
-            // Get full Telegram initData query
-            const initData = tg.initData || "";
-            
+            // Extract Telegram initData string directly from SDK or location search
+            let rawData = tg.initData || window.location.search.substring(1);
+
             try {
-                let response = await fetch(`/api/user-balance?${initData}`);
+                let response = await fetch(`/api/user-balance?${rawData}`);
                 let data = await response.json();
                 if (data && typeof data.balance === 'number') {
                     document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
@@ -567,8 +555,9 @@
             }
         }
 
-        // Fetch user balance on startup
+        // Fetch balance on initial load
         fetchBotWalletBalance();
     </script>
 </body>
-</html>
+                            </html>
+                            

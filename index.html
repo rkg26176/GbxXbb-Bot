@@ -469,7 +469,7 @@
     <div id="page-wallet" class="tab-page">
         <div class="wallet-card">
             <div class="wallet-title">💳 GBX Bot Wallet Balance</div>
-            <div class="wallet-bal" id="bot-wallet-balance">Loading...</div>
+            <div class="wallet-bal" id="bot-wallet-balance">₹0.00</div>
             <button class="add-money-btn" onclick="triggerBotAddBalance()">➕ Add Money to Wallet</button>
         </div>
 
@@ -518,9 +518,11 @@
         tg.ready();
         tg.expand();
 
+        let retryCount = 0;
+
         function getUserTelegramId() {
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                return tg.initDataUnsafe.user.id;
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                return window.Telegram.WebApp.initDataUnsafe.user.id;
             }
             return null;
         }
@@ -528,10 +530,15 @@
         async function fetchBotWalletBalance() {
             const uid = getUserTelegramId();
             if (!uid) {
-                // Retry if Telegram WebApp SDK takes a moment to pass initData
-                setTimeout(fetchBotWalletBalance, 250);
+                if (retryCount < 8) {
+                    retryCount++;
+                    setTimeout(fetchBotWalletBalance, 300);
+                } else {
+                    document.getElementById('bot-wallet-balance').innerText = "₹0.00";
+                }
                 return;
             }
+
             try {
                 let response = await fetch(`/api/user-balance/${uid}`);
                 let data = await response.json();
@@ -577,8 +584,9 @@
             }
         }
 
-        // Initial fetch
+        // Run balance fetch on start
         fetchBotWalletBalance();
     </script>
 </body>
-</html>
+    </html>
+        

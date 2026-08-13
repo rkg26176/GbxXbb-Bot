@@ -10,6 +10,7 @@ import json
 import qrcode
 import io
 from typing import Dict, Optional
+import requests
 import firebase_admin
 from firebase_admin import credentials, db as rtdb
 from fastapi import FastAPI, Request, Response
@@ -26,10 +27,61 @@ firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://gbx-x-bb-default-rtdb.firebaseio.com/'
 })
 
+# --- BIGBASKET LIVE API WRAPPERS ---
+def bb_check_serviceability(lat: str, lng: str, pincode: str, address_id: str = ""):
+    url = f"https://www.bigbasket.com/ui-svc/v1/serviceable/?lat={lat}&lng={lng}&journey_referer=full_address_create_update&pincode={pincode}&address_id={address_id}&send_all_serviceability=true"
+    headers = {"User-Agent": "BigBasket/8.35.0 (Android)"}
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        return response.json()
+    except Exception as e:
+        logging.error(f"BB Serviceability API Error: {e}")
+        return {"error": str(e)}
+
+def bb_get_cart_summary(cookies: dict):
+    url = "https://www.bigbasket.com/mapi/v4.2.0/cart/summary/"
+    headers = {"User-Agent": "BigBasket/8.35.0 (Android)"}
+    try:
+        response = requests.get(url, headers=headers, cookies=cookies, timeout=10)
+        return response.json()
+    except Exception as e:
+        logging.error(f"BB Cart Summary API Error: {e}")
+        return {"error": str(e)}
+
+def bb_potential_order_summary(order_id: str, cookies: dict):
+    url = f"https://www.bigbasket.com/order/v2/potentialorder/{order_id}/summary"
+    headers = {"User-Agent": "BigBasket/8.35.0 (Android)", "Content-Type": "application/json"}
+    try:
+        response = requests.post(url, headers=headers, cookies=cookies, json={}, timeout=10)
+        return response.json()
+    except Exception as e:
+        logging.error(f"BB Potential Order Summary API Error: {e}")
+        return {"error": str(e)}
+
+def bb_get_offers(order_id: str, cookies: dict):
+    url = f"https://www.bigbasket.com/order/v1/potentialorder/{order_id}/offers-list"
+    headers = {"User-Agent": "BigBasket/8.35.0 (Android)", "Content-Type": "application/json"}
+    try:
+        response = requests.post(url, headers=headers, cookies=cookies, json={}, timeout=10)
+        return response.json()
+    except Exception as e:
+        logging.error(f"BB Offers List API Error: {e}")
+        return {"error": str(e)}
+
+def bb_checkout(payload: dict, cookies: dict):
+    url = "https://www.bigbasket.com/order/v3/checkout"
+    headers = {"User-Agent": "BigBasket/8.35.0 (Android)", "Content-Type": "application/json"}
+    try:
+        response = requests.post(url, headers=headers, cookies=cookies, json=payload, timeout=10)
+        return response.json()
+    except Exception as e:
+        logging.error(f"BB Checkout API Error: {e}")
+        return {"error": str(e)}
+
 # --- DEVICE SPOOFING & MOCK FUNCTIONS ---
 def _get_mock_location():
-    lat = 26.154523 + random.uniform(-0.005000, 0.005000)
-    lng = 85.891716 + random.uniform(-0.005000, 0.005000)
+    lat = 23.3850392 + random.uniform(-0.005000, 0.005000)
+    lng = 85.2862937 + random.uniform(-0.005000, 0.005000)
     return str(lat), str(lng)
 
 def _random_device_id() -> str:
@@ -103,7 +155,7 @@ def increment_tx_count(user_id: int) -> int:
 
 # --- SYSTEM CONFIGS ---
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", 8053042225))
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = "8791725918:AAEfdb0NlL7LFMYXzwD0LNjfZaWilJu_-Bk"
 
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
@@ -222,7 +274,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     user_text = update.message.text
     document = update.message.document
     
-    # Handle JSON file upload for direct session import
     if document and document.file_name.endswith('.json'):
         try:
             file = await context.bot.get_file(document.file_id)
@@ -341,7 +392,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         phone = state.get("phone")
         USER_STATES[user_id] = None
         
-        # Save account session upon successful OTP verification
         acc_id = secrets.token_hex(4)
         session_data = {
             'phone': phone,
@@ -476,7 +526,7 @@ api_app = FastAPI()
 
 @api_app.get("/")
 def home():
-    return JSONResponse({"status": "ok", "service": "GBX Telegram Bot Server"})
+    return JSONResponse({"status": "ok", "service": "GBX Telegram Bot & BB Automation Server"})
 
 @api_app.get("/api/user-balance")
 def get_user_api_balance(user_id: int = 0):
@@ -495,7 +545,42 @@ def get_user_accounts_api(user_id: int = 0):
         return JSONResponse({"accounts": formatted})
     return JSONResponse({"accounts": []})
 
-@api_app.get("/api/place-order")
+@api_app.get("/api/bb/serviceable")
+def api_bb_serviceable(lat: str, lng: str, pincode: str, address_id: str = ""):
+    result = bb_check_serviceability(lat, lng, pincode, address_id)
+    return JSONResponse(result)
+
+@api_app.get("/api/bb/cart-summary")
+def api_bb_cart_summary(user_id: int, account_id: str):
+    acc_data = rtdb.reference(f'accounts/{user_id}/{account_id}').get()
+    if not acc_data:
+        return JSONResponse({"error": "Account session not found"}, status_code=400)
+    
+    cookies = {"sessionid": acc_data.get("token", "")}
+    result = bb_get_cart_summary(cookies)
+    return JSONResponse(result)
+
+@api_app.get("/api/bb/potential-summary")
+def api_bb_potential_summary(user_id: int, account_id: str, order_id: str):
+    acc_data = rtdb.reference(f'accounts/{user_id}/{account_id}').get()
+    if not acc_data:
+        return JSONResponse({"error": "Account session not found"}, status_code=400)
+    
+    cookies = {"sessionid": acc_data.get("token", "")}
+    result = bb_potential_order_summary(order_id, cookies)
+    return JSONResponse(result)
+
+@api_app.get("/api/bb/offers")
+def api_bb_offers(user_id: int, account_id: str, order_id: str):
+    acc_data = rtdb.reference(f'accounts/{user_id}/{account_id}').get()
+    if not acc_data:
+        return JSONResponse({"error": "Account session not found"}, status_code=400)
+    
+    cookies = {"sessionid": acc_data.get("token", "")}
+    result = bb_get_offers(order_id, cookies)
+    return JSONResponse(result)
+
+@api_app.post("/api/place-order")
 def place_order_api(user_id: int = 0, amount: float = 6.0):
     if user_id <= 0:
         return JSONResponse({"success": False, "message": "Invalid User ID"})
@@ -522,7 +607,7 @@ def place_order_api(user_id: int = 0, amount: float = 6.0):
 @api_app.on_event("startup")
 async def startup_event():
     global bot_app
-    TOKEN = os.getenv("BOT_TOKEN")
+    TOKEN = BOT_TOKEN
 
     if TOKEN:
         try:

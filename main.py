@@ -15,7 +15,7 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, db as rtdb
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
@@ -77,17 +77,41 @@ def _build_app_headers() -> dict:
         "connection": "keep-alive"
     }
 
+def _build_headers(session: Dict) -> Dict[str, str]:
+    h = {
+        "user-agent": "Mozilla/5.0 (Linux; Android 14; I2017 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.163 Mobile Safari/537.36",
+        "content-type": "application/json",
+        "client-id": "portal",
+        "platform": "Bigbasket-Android",
+        "x-requested-with": "in.bigbasket.android",
+    }
+    if session.get("tid"): h["tid"] = session["tid"]
+    if session.get("token"): h["token"] = session["token"]
+    if session.get("x-oztok"): h["x-oztok"] = session["x-oztok"]
+    if session.get("sid"): h["sid"] = session["sid"]
+    return h
+
+# --- REAL BIGBASKET AUTH & API WRAPPERS ---
 def bb_send_otp(phone: str):
     url = "https://www.bigbasket.com/member-tdl/v3/member/otp/"
     headers = _build_app_headers()
     payload = {"mobile": phone, "tag": "login"}
+    
     try:
         session = requests.Session()
         res = session.post(url, headers=headers, json=payload, timeout=15)
+        
+        logging.info(f"BB OTP Status: {res.status_code}")
+        logging.info(f"BB OTP Response: {res.text}")
+        
         if not res.text.strip():
             return {"status": "fail", "message": f"Blocked by Cloudflare/WAF (Status: {res.status_code})"}
+            
         return res.json()
+    except requests.exceptions.JSONDecodeError:
+        return {"status": "fail", "message": "Server returned non-JSON format (Anti-bot triggered)"}
     except Exception as e:
+        logging.error(f"BB Send OTP Error: {e}")
         return {"status": "fail", "message": str(e)}
 
 def bb_verify_otp(phone: str, otp: str):
@@ -99,9 +123,19 @@ def bb_verify_otp(phone: str, otp: str):
         res = session.post(url, headers=headers, json=payload, timeout=15)
         return res.json(), res.cookies.get_dict()
     except Exception as e:
+        logging.error(f"BB Verify OTP Error: {e}")
         return {"status": "fail"}, {}
 
-# --- USER HELPERS ---
+def bb_get_cart_summary(session: dict):
+    url = "https://www.bigbasket.com/mapi/v4.2.0/cart/summary/"
+    headers = _build_headers(session)
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+# --- USER MANAGEMENT HELPERS ---
 def get_user_data(user_id: int):
     try:
         ref = rtdb.reference(f'users/{user_id}')
@@ -109,7 +143,8 @@ def get_user_data(user_id: int):
         if data:
             return float(data.get('balance', 5.0)), float(data.get('points', 0.0))
         return 5.0, 0.0
-    except Exception:
+    except Exception as e:
+        logging.error(f"Error getting user data: {e}")
         return 5.0, 0.0
 
 def update_balance(user_id: int, amount: float):
@@ -120,6 +155,15 @@ def update_balance(user_id: int, amount: float):
         ref.update({'balance': new_bal})
     except Exception as e:
         logging.error(f"Error updating balance: {e}")
+
+def update_points(user_id: int, points_to_add: float):
+    try:
+        ref = rtdb.reference(f'users/{user_id}')
+        data = ref.get() or {'balance': 5.0, 'points': 0.0}
+        new_pts = float(data.get('points', 0.0)) + points_to_add
+        ref.update({'points': new_pts})
+    except Exception as e:
+        logging.error(f"Error updating points: {e}")
 
 def is_user_banned(user_id: int) -> bool:
     try:
@@ -225,6 +269,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data = user_ref.get()
         if not user_data:
             user_ref.set({'balance': 5.0, 'points': 0.0, 'tx_count': 0, 'username': update.effective_user.username or "N/A"})
+            if args and args[0].isdigit():
+                referrer_id = int(args[0])
+                if referrer_id != user_id:
+                    ref_check = rtdb.reference(f'referrals/{user_id}').get()
+                    if not ref_check:
+                        referrer_ref = rtdb.reference(f'users/{referrer_id}')
+                        if referrer_ref.get():
+                            rtdb.reference(f'referrals/{user_id}').set(referrer_id)
+                            current_pts = float(referrer_ref.get().get('points', 0.0)) + 2.0
+                            referrer_ref.update({'points': current_pts})
+                            if bot_app:
+                                try:
+                                    await bot_app.bot.send_message(referrer_id, f"🎉 **New Referral!** You earned **2 Points**!", parse_mode="Markdown")
+                                except Exception:
+                                    pass
     except Exception as e:
         logging.error(f"Start error: {e}")
 
@@ -257,13 +316,12 @@ async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_force_join_menu(update, remaining)
         return
 
-    server_url = os.getenv("RENDER_EXTERNAL_URL", "https://gbx-x-bb-bot.onrender.com")
     panel_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=server_url))]
+        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url="https://www.bigbasket.com"))]
     ])
     
     msg = await update.message.reply_text(
-        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your isolated Mini Web Panel. \n⚠️ *This panel will auto-delete in 60 seconds.*",
+        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel. \n⚠️ *This panel will auto-delete in 60 seconds.*",
         reply_markup=panel_markup,
         parse_mode="Markdown"
     )
@@ -581,48 +639,9 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- FASTAPI SERVER ---
 api_app = FastAPI()
 
-@api_app.get("/", response_class=HTMLResponse)
+@api_app.get("/")
 def home():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h3>GBX Bot Store Front-end index.html not found!</h3>"
-
-@api_app.get("/api/user-balance")
-def get_user_api_balance(user_id: int = 0):
-    if user_id > 0:
-        bal, pts = get_user_data(user_id)
-        return JSONResponse({"user_id": user_id, "balance": float(bal), "points": float(pts)})
-    return JSONResponse({"user_id": 0, "balance": 0.0, "points": 0.0})
-
-@api_app.get("/api/user-accounts")
-def get_user_accounts_api(user_id: int = 0):
-    if user_id > 0:
-        accs = rtdb.reference(f'accounts/{user_id}').get() or {}
-        formatted = []
-        for k, v in accs.items():
-            formatted.append({"id": k, "phone": v.get("phone", "N/A")})
-        return JSONResponse({"accounts": formatted})
-    return JSONResponse({"accounts": []})
-
-@api_app.get("/api/place-order")
-def place_order_api(user_id: int = 0, amount: float = 6.0):
-    if user_id <= 0:
-        return JSONResponse({"success": False, "message": "Invalid User ID"})
-    
-    current_bal, _ = get_user_data(user_id)
-    if current_bal >= amount:
-        new_bal = current_bal - amount
-        try:
-            rtdb.reference(f'users/{user_id}').update({'balance': new_bal})
-        except Exception:
-            return JSONResponse({"success": False, "message": "Database error processing payment."})
-        return JSONResponse({"success": True, "new_balance": float(new_bal)})
-    else:
-        return JSONResponse({
-            "success": False, 
-            "message": f"Your current balance is ₹{current_bal:.2f}. Required ₹{amount:.2f}."
-        })
+    return JSONResponse({"status": "ok", "service": "GBX Bot Server Running"})
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -632,6 +651,7 @@ async def startup_event():
         try:
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
             
+            # --- TELEGRAM LEFT MENU COMMANDS SETUP (BLUE BUTTON) ---
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
                 BotCommand("panel", "Open HTML Web Panel"),

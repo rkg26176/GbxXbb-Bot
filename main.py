@@ -3,6 +3,7 @@ import logging
 import random
 import re
 import time
+import asyncio
 import urllib.parse
 import secrets
 import base64
@@ -15,7 +16,7 @@ import firebase_admin
 from firebase_admin import credentials, db as rtdb
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
@@ -44,7 +45,7 @@ else:
     except Exception as e:
         logging.error(f"Firebase local init error: {e}")
 
-# --- DEVICE SPOOFING & HEADERS ---
+# --- ENHANCED DEVICE SPOOFING & HEADERS FOR OTP ---
 def _get_mock_location():
     lat = 26.154523 + random.uniform(-0.005000, 0.005000)
     lng = 85.891716 + random.uniform(-0.005000, 0.005000)
@@ -56,12 +57,16 @@ def _random_device_id() -> str:
 def _build_app_headers() -> dict:
     lat, lng = _get_mock_location()
     return {
-        "user-agent": "Bigbasket-Android",
+        "Host": "www.bigbasket.com",
+        "user-agent": "Bigbasket-Android/8.35.0 (Android/14; Vivo I2017)",
         "content-type": "application/json; charset=utf-8",
-        "accept": "application/json; charset=utf-8",
-        "accept-encoding": "gzip",
+        "accept": "application/json, text/plain, */*",
+        "accept-encoding": "gzip, deflate",
+        "x-requested-with": "in.bigbasket.android",
+        "client-id": "android",
+        "platform": "Bigbasket-Android",
         "version-code": "1590",
-        "app-version": "6.17.0",
+        "app-version": "8.35.0",
         "os-version": "14",
         "manufacturer": "VIVO",
         "model-name": "I2017",
@@ -69,6 +74,7 @@ def _build_app_headers() -> dict:
         "deviceid": _random_device_id(),
         "latitude": lat,
         "longitude": lng,
+        "connection": "keep-alive"
     }
 
 def _build_headers(session: Dict) -> Dict[str, str]:
@@ -90,13 +96,20 @@ def bb_send_otp(phone: str):
     url = "https://www.bigbasket.com/member-tdl/v3/member/otp/"
     headers = _build_app_headers()
     payload = {"mobile": phone, "tag": "login"}
+    
     try:
-        res = requests.post(url, headers=headers, json=payload, timeout=10)
+        session = requests.Session()
+        res = session.post(url, headers=headers, json=payload, timeout=15)
+        
+        logging.info(f"BB OTP Status: {res.status_code}")
+        logging.info(f"BB OTP Response: {res.text}")
+        
         if not res.text.strip():
-            return {"status": "fail", "message": f"Server returned empty response (Status: {res.status_code})"}
+            return {"status": "fail", "message": f"Blocked by Cloudflare/WAF (Status: {res.status_code})"}
+            
         return res.json()
     except requests.exceptions.JSONDecodeError:
-        return {"status": "fail", "message": "Non-JSON response from BigBasket"}
+        return {"status": "fail", "message": "Server returned non-JSON format (Anti-bot triggered)"}
     except Exception as e:
         logging.error(f"BB Send OTP Error: {e}")
         return {"status": "fail", "message": str(e)}
@@ -106,7 +119,8 @@ def bb_verify_otp(phone: str, otp: str):
     headers = _build_app_headers()
     payload = {"mobile": phone, "otp": otp, "tag": "login"}
     try:
-        res = requests.post(url, headers=headers, json=payload, timeout=10)
+        session = requests.Session()
+        res = session.post(url, headers=headers, json=payload, timeout=15)
         return res.json(), res.cookies.get_dict()
     except Exception as e:
         logging.error(f"BB Verify OTP Error: {e}")
@@ -292,6 +306,35 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=admin_markup, parse_mode="Markdown")
 
+async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if is_user_banned(user_id):
+        return
+
+    remaining = await get_remaining_channels(user_id)
+    if len(remaining) > 0:
+        await show_force_join_menu(update, remaining)
+        return
+
+    panel_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url="https://www.bigbasket.com"))]
+    ])
+    
+    msg = await update.message.reply_text(
+        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel. \n⚠️ *This panel will auto-delete in 60 seconds.*",
+        reply_markup=panel_markup,
+        parse_mode="Markdown"
+    )
+
+    async def delete_after_60(message_obj):
+        await asyncio.sleep(60)
+        try:
+            await message_obj.delete()
+        except Exception:
+            pass
+
+    asyncio.create_task(delete_after_60(msg))
+
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -319,19 +362,28 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     user_text = update.message.text
     document = update.message.document
     
+    json_data = None
     if document and document.file_name and document.file_name.endswith('.json'):
         try:
             file = await context.bot.get_file(document.file_id)
             file_bytes = await file.download_as_bytearray()
             json_data = json.loads(file_bytes.decode('utf-8'))
-            phone = json_data.get('phone', 'ImportedAccount')
-            acc_id = secrets.token_hex(4)
-            rtdb.reference(f'accounts/{user_id}/{acc_id}').set(json_data)
-            await update.message.reply_text(f"✅ **JSON Session Imported & Saved Successfully!**\nPhone: `{phone}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
-            return
         except Exception:
             await update.message.reply_text("❌ Invalid JSON file format.")
             return
+    elif user_text and user_text.strip().startswith("{") and user_text.strip().endswith("}"):
+        try:
+            json_data = json.loads(user_text.strip())
+        except Exception:
+            await update.message.reply_text("❌ Invalid JSON format. Please send a valid JSON session.")
+            return
+
+    if json_data:
+        phone = json_data.get('phone', json_data.get('bbAuthToken', 'ImportedAccount'))
+        acc_id = secrets.token_hex(4)
+        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(json_data)
+        await update.message.reply_text(f"✅ **JSON Session Accepted & Saved Successfully!**\nAccount ID: `{acc_id}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+        return
 
     if not user_text:
         return
@@ -447,12 +499,12 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             return
             
         res = bb_send_otp(phone)
-        if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success"):
+        if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
             USER_STATES[user_id] = {"state": "AWAITING_LOGIN_OTP", "phone": phone}
             await update.message.reply_text(f"📨 OTP successfully sent to `{phone}` by BigBasket API!\n\nKripya 6-digit ka **OTP** enter karein:", parse_mode="Markdown")
         else:
             USER_STATES[user_id] = None
-            await update.message.reply_text(f"❌ Failed to send OTP: {res.get('message', 'Unknown error')}")
+            await update.message.reply_text(f"❌ Failed to send OTP: {res.get('message', 'Unknown error / Anti-bot triggered')}")
         return
 
     elif isinstance(state, dict) and state.get("state") == "AWAITING_LOGIN_OTP":
@@ -495,15 +547,15 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             acc_list_text = f"📱 **Your Saved Accounts ({len(accs)}):**\n\n"
             keyboard_buttons = []
             for idx, (acc_key, acc_val) in enumerate(accs.items(), 1):
-                phone = acc_val.get('phone', 'N/A')
+                phone = acc_val.get('phone', acc_val.get('bbAuthToken', 'Account ' + str(idx))[:10])
                 acc_list_text += f"{idx}. 📞 `{phone}`\n"
-                keyboard_buttons.append([InlineKeyboardButton(f"📤 Export ({phone})", callback_data=f"export_auth:{user_id}:{acc_key}")])
+                keyboard_buttons.append([InlineKeyboardButton(f"📤 Export ({idx})", callback_data=f"export_auth:{user_id}:{acc_key}")])
             await update.message.reply_text(acc_list_text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
         else:
-            await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n\n📌 *No accounts found. Click '➕ New Login' or send account JSON file.*", parse_mode="Markdown")
+            await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n\n📌 *No accounts found. Click '➕ New Login' or paste JSON directly.*", parse_mode="Markdown")
     elif user_text == "➕ New Login":
         USER_STATES[user_id] = "AWAITING_LOGIN_PHONE"
-        await update.message.reply_text("📱 **Send your BigBasket Mobile Number (10-digit)**\n*(Or you can directly upload your .json session file here in chat)*", parse_mode="Markdown")
+        await update.message.reply_text("📱 **Send your BigBasket Mobile Number (10-digit)**\n*(Or you can directly paste your JSON session text here)*", parse_mode="Markdown")
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
@@ -547,7 +599,7 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             if acc_data:
                 json_str = json.dumps(acc_data, indent=2)
                 bio = io.BytesIO(json_str.encode('utf-8'))
-                bio.name = f"session_{acc_data.get('phone', 'account')}.json"
+                bio.name = f"session_account.json"
                 bio.seek(0)
                 await query.message.reply_document(document=bio, caption=f"📁 **Auth Exported**")
             return
@@ -600,6 +652,7 @@ async def startup_event():
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CommandHandler("admin", admin_command))
+            bot_app.add_handler(CommandHandler("panel", panel_command))
             bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
             bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
             bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*|export_auth:.*"))

@@ -63,12 +63,12 @@
             box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4); display: inline-block;
         }
 
-        /* ACCOUNT SELECTION SCREEN */
+        /* ACCOUNT SELECTION SCREEN (MANDATORY FIRST PAGE) */
         #account-selector-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: #090d16;
-            z-index: 999;
+            z-index: 999999;
             display: flex;
             flex-direction: column;
             padding: 24px;
@@ -183,7 +183,7 @@
         <a href="https://t.me/gbx_x_bb_bot" class="telegram-btn" target="_blank">Go to Telegram Bot</a>
     </div>
 
-    <!-- SPECIAL ACCOUNT SELECTION & SWITCH SCREEN -->
+    <!-- SPECIAL ACCOUNT SELECTION & SWITCH SCREEN (FORCED ON LOAD) -->
     <div id="account-selector-screen">
         <div class="selector-header">
             <div style="font-size: 44px; margin-bottom: 12px;">🛒</div>
@@ -322,7 +322,10 @@
         async function loadSelectorAccounts() {
             const uid = getTelegramUserId();
             const container = document.getElementById('selector-accounts-list');
-            if (!uid) return;
+            if (!uid) {
+                container.innerHTML = `<div style="text-align:center; color:#ef4444; font-weight:600;">User ID not found! Please open from Telegram Bot.</div>`;
+                return;
+            }
 
             try {
                 let res = await fetch(`/api/user-accounts?user_id=${uid}`);
@@ -342,7 +345,7 @@
                         let displayName = acc.name ? acc.name : "BigBasket Account";
                         let displayPhone = acc.phone ? acc.phone : "Connected Session";
                         html += `
-                            <div class="account-option-card ${isSelected ? 'active-switch' : ''}" id="acc-card-${acc.id}">
+                            <div class="account-option-card ${isSelected ? 'active-switch' : ''}" id="acc-card-${acc.id}" onclick="switchAccountSession('${acc.id}', '${displayPhone}')">
                                 <div class="account-info">
                                     <div class="account-icon">📱</div>
                                     <div class="account-details">
@@ -350,7 +353,7 @@
                                         <div class="acc-phone">+91 ${displayPhone}</div>
                                     </div>
                                 </div>
-                                <button class="switch-btn" onclick="switchAccountSession('${acc.id}', '${displayPhone}')">
+                                <button class="switch-btn">
                                     ${isSelected ? 'Active ✓' : 'Switch'}
                                 </button>
                             </div>`;
@@ -385,6 +388,7 @@
             if (!activeAccount && userAccounts.length > 0) {
                 switchAccountSession(userAccounts[0].id, userAccounts[0].phone || "Session");
             }
+            // Hide selection screen and show store
             document.getElementById('account-selector-screen').style.display = 'none';
         }
 
@@ -432,16 +436,6 @@
 
         function triggerBotAddBalance() { tg.sendData("ADD_BALANCE_TRIGGERED"); tg.close(); }
         function addToCart(name, price) { alert(`Added ${name} to cart.`); }
-
-        // Periodic check to auto-remove any rogue app-download popups injected dynamically
-        setInterval(() => {
-            document.querySelectorAll('div, aside, section').forEach(el => {
-                let text = el.innerText || '';
-                if ((text.includes('Download App') || text.includes('Best experience on app')) && el.id !== 'account-selector-screen') {
-                    el.style.display = 'none';
-                }
-            });
-        }, 1000);
 
         window.addEventListener('DOMContentLoaded', () => {
             checkTelegramEnvironment();

@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBX BigBasket Store</title>
-    <!-- Telegram WebApp SDK -->
+    <title>GBX BigBasket Portal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --bb-green: #10b981;
-            --bb-dark-green: #059669;
-            --bb-light-bg: #064e3b;
             --bg-color: #090d16;
             --text-color: #f8fafc;
             --card-bg: #111827;
@@ -32,16 +29,6 @@
             padding-bottom: 80px;
         }
 
-        /* --- FORCE HIDE EXTERNAL APP PROMOTIONS & POPUPS --- */
-        iframe[src*="app"], div[class*="banner"], div[class*="download"], div[id*="download"], 
-        header + div[style*="position: fixed"], .app-install-banner, .bb-app-banner {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-        }
-
-        /* --- EXTERNAL BROWSER LOCK SCREEN --- */
         #browser-lock-screen {
             display: none;
             position: fixed;
@@ -63,14 +50,13 @@
             box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4); display: inline-block;
         }
 
-        /* DASHBOARD & ACCOUNT MANAGEMENT UI */
         .tab-page { display: none; padding: 16px; }
         .tab-page.active-page { display: block; }
         .section-title { font-size: 18px; font-weight: 800; margin-bottom: 14px; color: #f8fafc; letter-spacing: -0.3px; }
 
         .account-option-card {
             background: var(--card-bg); border: 2px solid var(--border-color); border-radius: 14px;
-            padding: 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s;
+            padding: 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;
         }
         .account-option-card.active-switch { border-color: var(--bb-green); background: #13221c; }
         .account-info { display: flex; align-items: center; gap: 14px; }
@@ -116,7 +102,6 @@
 </head>
 <body>
 
-    <!-- EXTERNAL BROWSER LOCK SCREEN -->
     <div id="browser-lock-screen">
         <div class="lock-icon">🔒</div>
         <div class="lock-title">Access Restricted</div>
@@ -133,7 +118,6 @@
 
         <div class="section-title" style="margin-top: 24px;">➕ Add New Account</div>
         
-        <!-- Login with OTP Box -->
         <div class="action-box">
             <h3>🔑 Login with OTP</h3>
             <input type="text" id="otp-phone" class="input-field" placeholder="Enter 10-digit mobile number">
@@ -144,7 +128,6 @@
             </div>
         </div>
 
-        <!-- Login with JSON Box -->
         <div class="action-box">
             <h3>📁 Login with JSON Session</h3>
             <textarea id="json-input" class="input-field" rows="3" placeholder="Paste session JSON here..."></textarea>
@@ -161,7 +144,6 @@
         </div>
     </div>
 
-    <!-- Bottom Navigation Bar -->
     <div class="bottom-nav">
         <div class="nav-tab active" id="tab-accounts-btn" onclick="switchTab('accounts')">
             <span>📱</span><span>My Accounts</span>
@@ -207,8 +189,9 @@
                 } else {
                     let html = '';
                     userAccounts.forEach((acc) => {
+                        let isSelected = acc.active;
                         html += `
-                            <div class="account-option-card" id="acc-card-${acc.id}">
+                            <div class="account-option-card ${isSelected ? 'active-switch' : ''}" id="acc-card-${acc.id}">
                                 <div class="account-info">
                                     <div class="account-icon">📱</div>
                                     <div class="account-details">
@@ -217,7 +200,7 @@
                                     </div>
                                 </div>
                                 <div style="display:flex; gap:6px;">
-                                    <button class="switch-btn" onclick="switchAccountSession('${acc.id}')">Switch</button>
+                                    <button class="switch-btn" onclick="switchAccountSession('${acc.id}')">${isSelected ? 'Active ✓' : 'Switch'}</button>
                                     <button class="switch-btn" style="border-color:#3b82f6; color:#3b82f6;" onclick="exportAuth('${acc.id}')">Export</button>
                                 </div>
                             </div>`;
@@ -263,7 +246,7 @@
             });
             let data = await res.json();
             if(data.success) {
-                alert("📨 OTP sent successfully!");
+                alert("📨 OTP sent successfully via BigBasket API!");
                 document.getElementById('otp-verify-section').style.display = 'block';
             } else {
                 alert("❌ Failed to send OTP: " + (data.message || 'Unknown error'));
@@ -283,7 +266,7 @@
             });
             let data = await res.json();
             if(data.success) {
-                alert("✅ Login successful and session saved!");
+                alert("✅ Login successful and session saved with device spoofing!");
                 document.getElementById('otp-verify-section').style.display = 'none';
                 document.getElementById('otp-phone').value = '';
                 document.getElementById('otp-code').value = '';

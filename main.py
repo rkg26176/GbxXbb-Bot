@@ -15,14 +15,14 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, db as rtdb
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- FIREBASE REALTIME DATABASE SETUP (RENDER SAFE) ---
+# --- FIREBASE REALTIME DATABASE SETUP ---
 firebase_config_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
 
 if firebase_config_json:
@@ -58,29 +58,30 @@ def _build_app_headers() -> dict:
     lat, lng = _get_mock_location()
     return {
         "Host": "www.bigbasket.com",
-        "user-agent": "Bigbasket-Android/8.35.0 (Android/14; Vivo I2017)",
+        "user-agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
         "content-type": "application/json; charset=utf-8",
         "accept": "application/json, text/plain, */*",
-        "accept-encoding": "gzip, deflate",
+        "accept-language": "en-US,en;q=0.9",
+        "origin": "https://www.bigbasket.com",
+        "referer": "https://www.bigbasket.com/",
         "x-requested-with": "in.bigbasket.android",
         "client-id": "android",
         "platform": "Bigbasket-Android",
         "version-code": "1590",
         "app-version": "8.35.0",
         "os-version": "14",
-        "manufacturer": "VIVO",
-        "model-name": "I2017",
+        "manufacturer": "Google",
+        "model-name": "Pixel 7",
         "swuid": _random_device_id(),
         "deviceid": _random_device_id(),
         "latitude": lat,
         "longitude": lng,
-        "connection": "keep-alive",
-        "referer": "https://www.bigbasket.com/"
+        "connection": "keep-alive"
     }
 
 def _build_headers(session: Dict) -> Dict[str, str]:
     h = {
-        "user-agent": "Mozilla/5.0 (Linux; Android 14; I2017 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.163 Mobile Safari/537.36",
+        "user-agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
         "content-type": "application/json",
         "client-id": "portal",
         "platform": "Bigbasket-Android",
@@ -92,7 +93,6 @@ def _build_headers(session: Dict) -> Dict[str, str]:
     if session.get("sid"): h["sid"] = session["sid"]
     return h
 
-# --- PROFILE FETCHING (NAME & MOBILE) ---
 def fetch_bb_profile(session_data: dict) -> dict:
     url = "https://www.bigbasket.com/ui-svc/v1/member/details"
     headers = _build_headers(session_data)
@@ -109,27 +109,17 @@ def fetch_bb_profile(session_data: dict) -> dict:
         logging.error(f"Profile fetch error: {e}")
     return {"name": "BigBasket User", "phone": session_data.get("phone", "N/A")}
 
-# --- REAL BIGBASKET AUTH & API WRAPPERS ---
 def bb_send_otp(phone: str):
     url = "https://www.bigbasket.com/member-tdl/v3/member/otp/"
     headers = _build_app_headers()
     payload = {"mobile": phone, "tag": "login"}
-    
     try:
         session = requests.Session()
         res = session.post(url, headers=headers, json=payload, timeout=15)
-        
-        logging.info(f"BB OTP Status: {res.status_code}")
-        logging.info(f"BB OTP Response: {res.text}")
-        
         if not res.text.strip():
             return {"status": "fail", "message": f"Blocked by Cloudflare/WAF (Status: {res.status_code})"}
-            
         return res.json()
-    except requests.exceptions.JSONDecodeError:
-        return {"status": "fail", "message": "Server returned non-JSON format (Anti-bot triggered)"}
     except Exception as e:
-        logging.error(f"BB Send OTP Error: {e}")
         return {"status": "fail", "message": str(e)}
 
 def bb_verify_otp(phone: str, otp: str):
@@ -141,47 +131,27 @@ def bb_verify_otp(phone: str, otp: str):
         res = session.post(url, headers=headers, json=payload, timeout=15)
         return res.json(), res.cookies.get_dict()
     except Exception as e:
-        logging.error(f"BB Verify OTP Error: {e}")
         return {"status": "fail"}, {}
 
-def bb_get_cart_summary(session: dict):
-    url = "https://www.bigbasket.com/mapi/v4.2.0/cart/summary/"
-    headers = _build_headers(session)
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        return response.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-# --- USER MANAGEMENT HELPERS ---
+# --- USER HELPERS ---
 def get_user_data(user_id: int):
     try:
         ref = rtdb.reference(f'users/{user_id}')
         data = ref.get()
         if data:
-            return float(data.get('balance', 5.0)), float(data.get('points', 0.0))
-        return 5.0, 0.0
+            return float(data.get('balance', 5.0)), int(data.get('referral_count', 0))
+        return 5.0, 0
     except Exception as e:
-        logging.error(f"Error getting user data: {e}")
-        return 5.0, 0.0
+        return 5.0, 0
 
 def update_balance(user_id: int, amount: float):
     try:
         ref = rtdb.reference(f'users/{user_id}')
-        data = ref.get() or {'balance': 5.0, 'points': 0.0}
+        data = ref.get() or {'balance': 5.0, 'referral_count': 0}
         new_bal = float(data.get('balance', 5.0)) + amount
         ref.update({'balance': new_bal})
     except Exception as e:
-        logging.error(f"Error updating balance: {e}")
-
-def update_points(user_id: int, points_to_add: float):
-    try:
-        ref = rtdb.reference(f'users/{user_id}')
-        data = ref.get() or {'balance': 5.0, 'points': 0.0}
-        new_pts = float(data.get('points', 0.0)) + points_to_add
-        ref.update({'points': new_pts})
-    except Exception as e:
-        logging.error(f"Error updating points: {e}")
+        pass
 
 def is_user_banned(user_id: int) -> bool:
     try:
@@ -245,11 +215,11 @@ YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe"
 MERCHANT_NAME = "GBX"
 bot_app = None
 
+# Updated Bot Reply Keyboard (Removed My Accounts, New Login, Refer & Earn; Added Web Panel button)
 def load_dashboard_menu():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ New Login")],
-        [KeyboardButton("💰 Balance"), KeyboardButton("👥 Refer & Earn")],
-        [KeyboardButton("🛠️ Customer Care")]
+        [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")],
+        [KeyboardButton("🌐 Web Panel")]
     ], resize_keyboard=True)
 
 async def get_remaining_channels(user_id: int):
@@ -286,7 +256,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_ref = rtdb.reference(f'users/{user_id}')
         user_data = user_ref.get()
         if not user_data:
-            user_ref.set({'balance': 5.0, 'points': 0.0, 'tx_count': 0, 'username': update.effective_user.username or "N/A"})
+            user_ref.set({'balance': 5.0, 'referral_count': 0, 'tx_count': 0, 'username': update.effective_user.username or "N/A"})
             if args and args[0].isdigit():
                 referrer_id = int(args[0])
                 if referrer_id != user_id:
@@ -295,11 +265,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         referrer_ref = rtdb.reference(f'users/{referrer_id}')
                         if referrer_ref.get():
                             rtdb.reference(f'referrals/{user_id}').set(referrer_id)
-                            current_pts = float(referrer_ref.get().get('points', 0.0)) + 2.0
-                            referrer_ref.update({'points': current_pts})
+                            curr_refs = int(referrer_ref.get().get('referral_count', 0)) + 1
+                            curr_bal = float(referrer_ref.get().get('balance', 5.0)) + 2.0
+                            referrer_ref.update({'balance': curr_bal, 'referral_count': curr_refs})
                             if bot_app:
                                 try:
-                                    await bot_app.bot.send_message(referrer_id, f"🎉 **New Referral!** You earned **2 Points**!", parse_mode="Markdown")
+                                    await bot_app.bot.send_message(referrer_id, f"🎉 **New Referral!** ₹2 added to your balance!", parse_mode="Markdown")
                                 except Exception:
                                     pass
     except Exception as e:
@@ -324,95 +295,12 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=admin_markup, parse_mode="Markdown")
 
-async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if is_user_banned(user_id):
-        return
-
-    remaining = await get_remaining_channels(user_id)
-    if len(remaining) > 0:
-        await show_force_join_menu(update, remaining)
-        return
-
-    panel_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url="https://www.bigbasket.com"))]
-    ])
-    
-    msg = await update.message.reply_text(
-        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel. \n⚠️ *This panel will auto-delete in 60 seconds.*",
-        reply_markup=panel_markup,
-        parse_mode="Markdown"
-    )
-
-    async def delete_after_60(message_obj):
-        await asyncio.sleep(60)
-        try:
-            await message_obj.delete()
-        except Exception:
-            pass
-
-    asyncio.create_task(delete_after_60(msg))
-
-async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    await query.answer()
-    
-    remaining = await get_remaining_channels(user_id)
-    if len(remaining) == 0:
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-        await query.message.reply_text("✅ **Access Granted! Welcome.**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
-    else:
-        buttons = []
-        for target in remaining:
-            buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
-        buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-        await query.message.edit_text(f"⚠️ Bache hue `{len(remaining)}` channels join karein:", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
-
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if is_user_banned(user_id):
         return
 
     user_text = update.message.text
-    document = update.message.document
-    
-    json_data = None
-    if document and document.file_name and document.file_name.endswith('.json'):
-        try:
-            file = await context.bot.get_file(document.file_id)
-            file_bytes = await file.download_as_bytearray()
-            json_data = json.loads(file_bytes.decode('utf-8'))
-        except Exception:
-            await update.message.reply_text("❌ Invalid JSON file format.")
-            return
-    elif user_text and user_text.strip().startswith("{") and user_text.strip().endswith("}"):
-        try:
-            json_data = json.loads(user_text.strip())
-        except Exception:
-            await update.message.reply_text("❌ Invalid JSON format. Please send a valid JSON session.")
-            return
-
-    if json_data:
-        profile = fetch_bb_profile(json_data)
-        phone = profile.get("phone", json_data.get('phone', 'Imported'))
-        name = profile.get("name", "BigBasket Account")
-        
-        acc_id = secrets.token_hex(4)
-        session_payload = {
-            'phone': phone,
-            'name': name,
-            'token': json_data.get('token', ''),
-            'tid': json_data.get('tid', ''),
-            'cookies': json_data.get('cookies', {})
-        }
-        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
-        await update.message.reply_text(f"✅ **JSON Session Accepted & Saved Successfully!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
-        return
-
     if not user_text:
         return
 
@@ -422,49 +310,12 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         await show_force_join_menu(update, remaining)
         return
 
-    if user_text in ["📱 My Accounts", "➕ New Login", "💰 Balance", "👥 Refer & Earn", "🛠️ Customer Care"]:
+    if user_text in ["💰 Balance", "🛠️ Customer Care", "🌐 Web Panel"]:
         USER_STATES[user_id] = None
 
     state = USER_STATES.get(user_id)
 
-    if state == "AWAITING_BROADCAST":
-        USER_STATES[user_id] = None
-        if user_text.lower() == "cancel":
-            await update.message.reply_text("❌ Broadcast cancelled.")
-            return
-        user_ids = get_all_user_ids()
-        success, fail = 0, 0
-        status_msg = await update.message.reply_text(f"🚀 Broadcasting to {len(user_ids)} users...")
-        for uid in user_ids:
-            try:
-                await bot_app.bot.copy_message(chat_id=uid, from_chat_id=update.message.chat_id, message_id=update.message.message_id)
-                success += 1
-            except Exception:
-                fail += 1
-        await status_msg.edit_text(f"✅ **Broadcast Finished!**\n- Sent: {success}\n- Failed: {fail}")
-        return
-
-    elif state == "AWAITING_BAN_ID":
-        USER_STATES[user_id] = None
-        target_uid = user_text.strip()
-        if target_uid.isdigit():
-            rtdb.reference(f'banned_users/{target_uid}').set(True)
-            await update.message.reply_text(f"🚫 User ID `{target_uid}` has been banned successfully.")
-        else:
-            await update.message.reply_text("❌ Invalid User ID number.")
-        return
-
-    elif state == "AWAITING_UNBAN_ID":
-        USER_STATES[user_id] = None
-        target_uid = user_text.strip()
-        if target_uid.isdigit():
-            rtdb.reference(f'banned_users/{target_uid}').delete()
-            await update.message.reply_text(f"✅ User ID `{target_uid}` has been unbanned.")
-        else:
-            await update.message.reply_text("❌ Invalid User ID number.")
-        return
-
-    elif state == "AWAITING_AMOUNT":
+    if state == "AWAITING_AMOUNT":
         try:
             amount = float(user_text)
             if amount < 10.0:
@@ -504,7 +355,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         tx_data = PENDING_TX.get(user_id)
         amount = tx_data["amount"] if tx_data else 10.0
         USER_STATES[user_id] = None
-        tx_count = increment_tx_count(user_id)
+        increment_tx_count(user_id)
         
         if bot_app:
             admin_msg = f"📥 **Payment Request**\n👤 User ID: `{user_id}`\n🔢 UTR: `{utr}`\n💰 Amount: ₹{amount}"
@@ -520,162 +371,52 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("⏳ **Payment Verification Pending!**")
         return
 
-    elif state == "AWAITING_LOGIN_PHONE":
-        phone = user_text.strip()
-        if not re.match(r"^\d{10}$", phone):
-            await update.message.reply_text("❌ Kripya valid 10-digit mobile number enter karein.")
-            return
-            
-        res = bb_send_otp(phone)
-        if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
-            USER_STATES[user_id] = {"state": "AWAITING_LOGIN_OTP", "phone": phone}
-            await update.message.reply_text(f"📨 OTP successfully sent to `{phone}` by BigBasket API!\n\nKripya 6-digit ka **OTP** enter karein:", parse_mode="Markdown")
-        else:
-            USER_STATES[user_id] = None
-            await update.message.reply_text(f"❌ Failed to send OTP: {res.get('message', 'Unknown error / Anti-bot triggered')}")
-        return
-
-    elif isinstance(state, dict) and state.get("state") == "AWAITING_LOGIN_OTP":
-        otp = user_text.strip()
-        phone = state.get("phone")
-        USER_STATES[user_id] = None
-        
-        verify_res, cookies = bb_verify_otp(phone, otp)
-        token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
-        tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
-        
-        temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
-        profile = fetch_bb_profile(temp_session)
-        name = profile.get("name", "BigBasket User")
-        
-        acc_id = secrets.token_hex(4)
-        session_data = {
-            'phone': phone,
-            'name': name,
-            'token': token,
-            'tid': tid,
-            'cookies': cookies
-        }
-        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
-        
-        await update.message.reply_text(f"✅ **Account Login Successful!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`\nSession saved to My Accounts.", parse_mode="Markdown", reply_markup=load_dashboard_menu())
-        return
-
     if user_text == "💰 Balance":
-        current_bal, current_pts = get_user_data(user_id)
-        USER_STATES[user_id] = "AWAITING_AMOUNT"
-        await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n⭐ **Points:** `{current_pts:.1f}`\n\n📥 Enter amount to deposit (Min ₹10):", parse_mode="Markdown")
-    elif user_text == "👥 Refer & Earn":
-        bot_username = context.bot.username
+        current_bal, total_refs = get_user_data(user_id)
+        bot_username = context.bot.username if context.bot else "gbx_x_bb_bot"
         ref_link = f"https://t.me/{bot_username}?start={user_id}"
-        _, current_pts = get_user_data(user_id)
-        ref_text = f"👥 **Refer & Earn**\n\n🔗 Link:\n`{ref_link}`\n\n⭐ Points: **{current_pts:.1f}**"
-        await update.message.reply_text(ref_text, parse_mode="Markdown")
+        
+        balance_text = (
+            f"💳 **Your Balance:** `₹{current_bal:.2f}`\n\n"
+            f"👥 **Total Referrals:** `{total_refs}`\n"
+            f"🔗 **Referral Link:**\n`{ref_link}`\n\n"
+            f"📥 **Enter amount to deposit (Min ₹10):**"
+        )
+        USER_STATES[user_id] = "AWAITING_AMOUNT"
+        await update.message.reply_text(balance_text, parse_mode="Markdown")
+
     elif user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
-        await update.message.reply_text("🛠️ Click below to open Customer Care Mini App / Support:", reply_markup=support_keyboard)
-    elif user_text == "📱 My Accounts":
-        accs = rtdb.reference(f'accounts/{user_id}').get() or {}
-        if accs:
-            acc_list_text = f"📱 **Your Saved Accounts ({len(accs)}):**\n\n"
-            keyboard_buttons = []
-            for idx, (acc_key, acc_val) in enumerate(accs.items(), 1):
-                phone = acc_val.get('phone', 'Account ' + str(idx))
-                name = acc_val.get('name', 'User')
-                acc_list_text += f"{idx}. 👤 `{name}` | 📞 `{phone}`\n"
-                keyboard_buttons.append([InlineKeyboardButton(f"📤 Export ({idx})", callback_data=f"export_auth:{user_id}:{acc_key}")])
-            await update.message.reply_text(acc_list_text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
-        else:
-            await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n\n📌 *No accounts found. Click '➕ New Login' or paste JSON directly.*", parse_mode="Markdown")
-    elif user_text == "➕ New Login":
-        USER_STATES[user_id] = "AWAITING_LOGIN_PHONE"
-        await update.message.reply_text("📱 **Send your BigBasket Mobile Number (10-digit)**\n*(Or you can directly paste your JSON session text here)*", parse_mode="Markdown")
+        await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
+
+    elif user_text == "🌐 Web Panel":
+        panel_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url="https://www.bigbasket.com"))]
+        ])
+        msg = await update.message.reply_text(
+            "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel.\n⚠️ *This panel will auto-delete in 60 seconds.*",
+            reply_markup=panel_markup,
+            parse_mode="Markdown"
+        )
+        async def delete_after_60(message_obj):
+            await asyncio.sleep(60)
+            try:
+                await message_obj.delete()
+            except Exception:
+                pass
+        asyncio.create_task(delete_after_60(msg))
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
-async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global bot_app
-    query = update.callback_query
-    if query:
-        await query.answer()
-        data = query.data.split(":")
-        
-        if data[0] == "adm_menu_broadcast":
-            USER_STATES[query.from_user.id] = "AWAITING_BROADCAST"
-            cancel_btn = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="adm_cancel")]])
-            await query.message.reply_text("📢 Kuch bhi message ya sticker bhejein jo sabhi users ko broadcast karna ho:\n*(Ya 'cancel' type karein)*", reply_markup=cancel_btn)
-            return
-        elif data[0] == "adm_menu_userlist":
-            users = rtdb.reference('users').get() or {}
-            user_str = f"👥 **Total Users: {len(users)}**\n\n"
-            for uid, udata in list(users.items())[:35]:
-                uname = udata.get('username', 'N/A')
-                user_str += f"🆔 `{uid}` | @{uname}\n"
-            await query.message.reply_text(user_str, parse_mode="Markdown")
-            return
-        elif data[0] == "adm_menu_ban":
-            USER_STATES[query.from_user.id] = "AWAITING_BAN_ID"
-            await query.message.reply_text("🚫 Jise ban karna hai uska **User ID** type karein:")
-            return
-        elif data[0] == "adm_menu_unban":
-            USER_STATES[query.from_user.id] = "AWAITING_UNBAN_ID"
-            await query.message.reply_text("✅ Jise unban karna hai uska **User ID** type karein:")
-            return
-        elif data[0] == "adm_cancel":
-            USER_STATES[query.from_user.id] = None
-            await query.message.reply_text("❌ Action cancelled.")
-            return
-
-        if data[0] == "export_auth":
-            target_user = int(data[1])
-            acc_key = data[2]
-            acc_data = rtdb.reference(f'accounts/{target_user}/{acc_key}').get()
-            if acc_data:
-                json_str = json.dumps(acc_data, indent=2)
-                bio = io.BytesIO(json_str.encode('utf-8'))
-                bio.name = f"session_account.json"
-                bio.seek(0)
-                await query.message.reply_document(document=bio, caption=f"📁 **Auth Exported**")
-            return
-
-        action, target_user = data[0], int(data[1])
-        utr = data[3] if len(data) > 3 else "N/A"
-        if utr != "N/A":
-            add_used_utr(utr)
-
-        if action == "adm_accept":
-            amount = float(data[2])
-            update_balance(target_user, amount) 
-            PENDING_TX.pop(target_user, None)
-            await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
-            if bot_app:
-                try:
-                    await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!** ₹{amount} added to balance.")
-                except Exception:
-                    pass
-        elif action == "adm_reject":
-            PENDING_TX.pop(target_user, None)
-            await query.message.edit_text(f"❌ Rejected request for User `{target_user}`.")
-            if bot_app:
-                try:
-                    await bot_app.bot.send_message(target_user, "⌛ **Payment Rejected!** Invalid UTR.")
-                except Exception:
-                    pass
-
-async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    await query.answer()
-    USER_STATES[user_id] = "AWAITING_UTR"
-    await query.message.delete()
-    await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
-
-# --- FASTAPI SERVER & ENDPOINTS FOR MINI WEB ---
+# --- FASTAPI SERVER & ENDPOINTS ---
 api_app = FastAPI()
 
-@api_app.get("/")
-def home():
-    return JSONResponse({"status": "ok", "service": "GBX Bot Server Running"})
+@api_app.get("/", response_class=HTMLResponse)
+def serve_index():
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h3>index.html not found!</h3>"
 
 @api_app.get("/api/user-accounts")
 def api_user_accounts(user_id: int):
@@ -694,8 +435,8 @@ def api_user_accounts(user_id: int):
 
 @api_app.get("/api/user-balance")
 def api_user_balance(user_id: int):
-    bal, pts = get_user_data(user_id)
-    return {"balance": bal, "points": pts}
+    bal, _ = get_user_data(user_id)
+    return {"balance": bal}
 
 @api_app.get("/api/set-active-session")
 def api_set_active_session(user_id: int, acc_id: str):
@@ -708,14 +449,71 @@ def api_set_active_session(user_id: int, acc_id: str):
         pass
     return {"status": "fail"}
 
-@api_app.get("/api/place-order")
-def api_place_order(user_id: int, amount: float):
-    bal, pts = get_user_data(user_id)
-    if bal >= amount:
-        new_bal = bal - amount
-        rtdb.reference(f'users/{user_id}').update({'balance': new_bal})
-        return {"success": True, "new_balance": new_bal}
-    return {"success": False, "message": "Low balance in wallet!", "balance": bal}
+@api_app.get("/api/export-auth")
+def api_export_auth(user_id: int, acc_id: str):
+    try:
+        acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
+        if acc_data:
+            return {"json_data": acc_data}
+    except Exception:
+        pass
+    return {"json_data": None}
+
+@api_app.post("/api/send-otp")
+async def api_send_otp(request: Request):
+    data = await request.json()
+    phone = data.get("phone")
+    res = bb_send_otp(phone)
+    if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
+        return {"success": True}
+    return {"success": False, "message": res.get("message", "Failed to send OTP")}
+
+@api_app.post("/api/verify-otp")
+async def api_verify_otp(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    phone = data.get("phone")
+    otp = data.get("otp")
+    
+    verify_res, cookies = bb_verify_otp(phone, otp)
+    token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
+    tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
+    
+    temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
+    profile = fetch_bb_profile(temp_session)
+    name = profile.get("name", "BigBasket User")
+    
+    acc_id = secrets.token_hex(4)
+    session_data = {
+        'phone': phone,
+        'name': name,
+        'token': token,
+        'tid': tid,
+        'cookies': cookies
+    }
+    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
+    return {"success": True}
+
+@api_app.post("/api/save-json")
+async def api_save_json(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    json_data = data.get("json_data")
+    
+    profile = fetch_bb_profile(json_data)
+    phone = profile.get("phone", json_data.get('phone', 'Imported'))
+    name = profile.get("name", "BigBasket Account")
+    
+    acc_id = secrets.token_hex(4)
+    session_payload = {
+        'phone': phone,
+        'name': name,
+        'token': json_data.get('token', ''),
+        'tid': json_data.get('tid', ''),
+        'cookies': json_data.get('cookies', {})
+    }
+    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
+    return {"success": True}
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -727,17 +525,12 @@ async def startup_event():
             
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
-                BotCommand("panel", "Open HTML Web Panel"),
                 BotCommand("admin", "Admin Control Panel")
             ]
             await bot_app.bot.set_my_commands(commands)
             
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CommandHandler("admin", admin_command))
-            bot_app.add_handler(CommandHandler("panel", panel_command))
-            bot_app.add_handler(CallbackQueryHandler(verify_callback_handler, pattern="verify_all_joins"))
-            bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-            bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*|export_auth:.*"))
             bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.ALL & ~filters.COMMAND, handle_text_messages))
             
             await bot_app.initialize()

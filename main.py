@@ -74,7 +74,8 @@ def _build_app_headers() -> dict:
         "deviceid": _random_device_id(),
         "latitude": lat,
         "longitude": lng,
-        "connection": "keep-alive"
+        "connection": "keep-alive",
+        "referer": "https://www.bigbasket.com/"
     }
 
 def _build_headers(session: Dict) -> Dict[str, str]:
@@ -90,6 +91,23 @@ def _build_headers(session: Dict) -> Dict[str, str]:
     if session.get("x-oztok"): h["x-oztok"] = session["x-oztok"]
     if session.get("sid"): h["sid"] = session["sid"]
     return h
+
+# --- PROFILE FETCHING (NAME & MOBILE) ---
+def fetch_bb_profile(session_data: dict) -> dict:
+    url = "https://www.bigbasket.com/ui-svc/v1/member/details"
+    headers = _build_headers(session_data)
+    try:
+        cookies = session_data.get("cookies", {})
+        res = requests.get(url, headers=headers, cookies=cookies, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            member = data.get("member", data.get("data", {}))
+            name = member.get("name", member.get("first_name", "BigBasket User"))
+            phone = member.get("mobile", member.get("phone", ""))
+            return {"name": name, "phone": phone}
+    except Exception as e:
+        logging.error(f"Profile fetch error: {e}")
+    return {"name": "BigBasket User", "phone": session_data.get("phone", "N/A")}
 
 # --- REAL BIGBASKET AUTH & API WRAPPERS ---
 def bb_send_otp(phone: str):
@@ -379,10 +397,20 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             return
 
     if json_data:
-        phone = json_data.get('phone', json_data.get('bbAuthToken', 'ImportedAccount'))
+        profile = fetch_bb_profile(json_data)
+        phone = profile.get("phone", json_data.get('phone', 'Imported'))
+        name = profile.get("name", "BigBasket Account")
+        
         acc_id = secrets.token_hex(4)
-        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(json_data)
-        await update.message.reply_text(f"✅ **JSON Session Accepted & Saved Successfully!**\nAccount ID: `{acc_id}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+        session_payload = {
+            'phone': phone,
+            'name': name,
+            'token': json_data.get('token', ''),
+            'tid': json_data.get('tid', ''),
+            'cookies': json_data.get('cookies', {})
+        }
+        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
+        await update.message.reply_text(f"✅ **JSON Session Accepted & Saved Successfully!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
         return
 
     if not user_text:
@@ -516,16 +544,21 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
         tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
         
+        temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
+        profile = fetch_bb_profile(temp_session)
+        name = profile.get("name", "BigBasket User")
+        
         acc_id = secrets.token_hex(4)
         session_data = {
             'phone': phone,
+            'name': name,
             'token': token,
             'tid': tid,
             'cookies': cookies
         }
         rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
         
-        await update.message.reply_text(f"✅ **Account Login Successful!**\nPhone: `{phone}`\nSession saved to My Accounts.", parse_mode="Markdown", reply_markup=load_dashboard_menu())
+        await update.message.reply_text(f"✅ **Account Login Successful!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`\nSession saved to My Accounts.", parse_mode="Markdown", reply_markup=load_dashboard_menu())
         return
 
     if user_text == "💰 Balance":
@@ -547,8 +580,9 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             acc_list_text = f"📱 **Your Saved Accounts ({len(accs)}):**\n\n"
             keyboard_buttons = []
             for idx, (acc_key, acc_val) in enumerate(accs.items(), 1):
-                phone = acc_val.get('phone', acc_val.get('bbAuthToken', 'Account ' + str(idx))[:10])
-                acc_list_text += f"{idx}. 📞 `{phone}`\n"
+                phone = acc_val.get('phone', 'Account ' + str(idx))
+                name = acc_val.get('name', 'User')
+                acc_list_text += f"{idx}. 👤 `{name}` | 📞 `{phone}`\n"
                 keyboard_buttons.append([InlineKeyboardButton(f"📤 Export ({idx})", callback_data=f"export_auth:{user_id}:{acc_key}")])
             await update.message.reply_text(acc_list_text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
         else:
@@ -636,12 +670,52 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI SERVER ---
+# --- FASTAPI SERVER & ENDPOINTS FOR MINI WEB ---
 api_app = FastAPI()
 
 @api_app.get("/")
 def home():
     return JSONResponse({"status": "ok", "service": "GBX Bot Server Running"})
+
+@api_app.get("/api/user-accounts")
+def api_user_accounts(user_id: int):
+    try:
+        accs = rtdb.reference(f'accounts/{user_id}').get() or {}
+        accounts_list = []
+        for acc_id, acc_val in accs.items():
+            accounts_list.append({
+                "id": acc_id,
+                "phone": acc_val.get('phone', 'N/A'),
+                "name": acc_val.get('name', 'BigBasket User')
+            })
+        return {"accounts": accounts_list}
+    except Exception as e:
+        return {"accounts": [], "error": str(e)}
+
+@api_app.get("/api/user-balance")
+def api_user_balance(user_id: int):
+    bal, pts = get_user_data(user_id)
+    return {"balance": bal, "points": pts}
+
+@api_app.get("/api/set-active-session")
+def api_set_active_session(user_id: int, acc_id: str):
+    try:
+        acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
+        if acc_data:
+            rtdb.reference(f'active_session/{user_id}').set(acc_data)
+            return {"status": "success"}
+    except Exception:
+        pass
+    return {"status": "fail"}
+
+@api_app.get("/api/place-order")
+def api_place_order(user_id: int, amount: float):
+    bal, pts = get_user_data(user_id)
+    if bal >= amount:
+        new_bal = bal - amount
+        rtdb.reference(f'users/{user_id}').update({'balance': new_bal})
+        return {"success": True, "new_balance": new_bal}
+    return {"success": False, "message": "Low balance in wallet!", "balance": bal}
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -651,7 +725,6 @@ async def startup_event():
         try:
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
             
-            # --- TELEGRAM LEFT MENU COMMANDS SETUP (BLUE BUTTON) ---
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
                 BotCommand("panel", "Open HTML Web Panel"),

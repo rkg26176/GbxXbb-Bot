@@ -21,11 +21,29 @@ from telegram.error import TelegramError
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- FIREBASE REALTIME DATABASE SETUP ---
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://gbx-x-bb-default-rtdb.firebaseio.com/'
-})
+# --- FIREBASE REALTIME DATABASE SETUP (RENDER SAFE) ---
+firebase_config_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
+
+if firebase_config_json:
+    try:
+        cred_dict = json.loads(firebase_config_json)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://gbx-x-bb-default-rtdb.firebaseio.com/'
+        })
+        logging.info("Firebase initialized successfully from Environment Variable!")
+    except Exception as e:
+        logging.error(f"Firebase Env Init Error: {e}")
+else:
+    # लोकल टेस्टिंग के लिए यदि एनवायरमेंट वेरिएबल न हो
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://gbx-x-bb-default-rtdb.firebaseio.com/'
+        })
+        logging.info("Firebase initialized using local serviceAccountKey.json")
+    except Exception as e:
+        logging.error(f"Firebase local init error: {e}")
 
 # --- BIGBASKET LIVE API WRAPPERS ---
 def bb_check_serviceability(lat: str, lng: str, pincode: str, address_id: str = ""):

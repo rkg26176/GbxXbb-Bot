@@ -16,7 +16,7 @@ import firebase_admin
 from firebase_admin import credentials, db as rtdb
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
 
@@ -650,6 +650,15 @@ async def startup_event():
     if TOKEN:
         try:
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
+            
+            # --- TELEGRAM LEFT MENU COMMANDS SETUP (BLUE BUTTON) ---
+            commands = [
+                BotCommand("start", "Start the bot & open dashboard"),
+                BotCommand("panel", "Open HTML Web Panel"),
+                BotCommand("admin", "Admin Control Panel")
+            ]
+            await bot_app.bot.set_my_commands(commands)
+            
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CommandHandler("admin", admin_command))
             bot_app.add_handler(CommandHandler("panel", panel_command))

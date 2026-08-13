@@ -1,4 +1,8 @@
-fastapi==0.110.0
-uvicorn==0.28.0
-python-telegram-bot==21.0.1
-psycopg2-binary==2.9.9
+fastapi
+uvicorn
+python-telegram-bot
+psycopg2-binary
+requests
+qrcode
+pillow
+urllib3

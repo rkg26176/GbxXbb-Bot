@@ -92,7 +92,11 @@ def bb_send_otp(phone: str):
     payload = {"mobile": phone, "tag": "login"}
     try:
         res = requests.post(url, headers=headers, json=payload, timeout=10)
+        if not res.text.strip():
+            return {"status": "fail", "message": f"Server returned empty response (Status: {res.status_code})"}
         return res.json()
+    except requests.exceptions.JSONDecodeError:
+        return {"status": "fail", "message": "Non-JSON response from BigBasket"}
     except Exception as e:
         logging.error(f"BB Send OTP Error: {e}")
         return {"status": "fail", "message": str(e)}
@@ -126,6 +130,7 @@ def get_user_data(user_id: int):
             return float(data.get('balance', 5.0)), float(data.get('points', 0.0))
         return 5.0, 0.0
     except Exception as e:
+        logging.error(f"Error getting user data: {e}")
         return 5.0, 0.0
 
 def update_balance(user_id: int, amount: float):
@@ -136,6 +141,15 @@ def update_balance(user_id: int, amount: float):
         ref.update({'balance': new_bal})
     except Exception as e:
         logging.error(f"Error updating balance: {e}")
+
+def update_points(user_id: int, points_to_add: float):
+    try:
+        ref = rtdb.reference(f'users/{user_id}')
+        data = ref.get() or {'balance': 5.0, 'points': 0.0}
+        new_pts = float(data.get('points', 0.0)) + points_to_add
+        ref.update({'points': new_pts})
+    except Exception as e:
+        logging.error(f"Error updating points: {e}")
 
 def is_user_banned(user_id: int) -> bool:
     try:
@@ -313,7 +327,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             phone = json_data.get('phone', 'ImportedAccount')
             acc_id = secrets.token_hex(4)
             rtdb.reference(f'accounts/{user_id}/{acc_id}').set(json_data)
-            await update.message.reply_text(f"✅ **JSON Session Imported!**\nPhone: `{phone}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+            await update.message.reply_text(f"✅ **JSON Session Imported & Saved Successfully!**\nPhone: `{phone}`", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
             return
         except Exception:
             await update.message.reply_text("❌ Invalid JSON file format.")
@@ -432,14 +446,13 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("❌ Kripya valid 10-digit mobile number enter karein.")
             return
             
-        # REAL OTP TRIGGER VIA API
         res = bb_send_otp(phone)
         if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success"):
             USER_STATES[user_id] = {"state": "AWAITING_LOGIN_OTP", "phone": phone}
             await update.message.reply_text(f"📨 OTP successfully sent to `{phone}` by BigBasket API!\n\nKripya 6-digit ka **OTP** enter karein:", parse_mode="Markdown")
         else:
             USER_STATES[user_id] = None
-            await update.message.reply_text(f"❌ Failed to send OTP via BigBasket API: {res.get('message', 'Unknown error')}")
+            await update.message.reply_text(f"❌ Failed to send OTP: {res.get('message', 'Unknown error')}")
         return
 
     elif isinstance(state, dict) and state.get("state") == "AWAITING_LOGIN_OTP":
@@ -447,7 +460,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         phone = state.get("phone")
         USER_STATES[user_id] = None
         
-        # REAL OTP VERIFICATION VIA API
         verify_res, cookies = bb_verify_otp(phone, otp)
         token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
         tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
@@ -461,7 +473,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         }
         rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
         
-        await update.message.reply_text(f"✅ **Account Login Successful!**\nPhone: `{phone}`\nSession & Cookies saved securely.", parse_mode="Markdown", reply_markup=load_dashboard_menu())
+        await update.message.reply_text(f"✅ **Account Login Successful!**\nPhone: `{phone}`\nSession saved to My Accounts.", parse_mode="Markdown", reply_markup=load_dashboard_menu())
         return
 
     if user_text == "💰 Balance":
@@ -488,10 +500,10 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
                 keyboard_buttons.append([InlineKeyboardButton(f"📤 Export ({phone})", callback_data=f"export_auth:{user_id}:{acc_key}")])
             await update.message.reply_text(acc_list_text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
         else:
-            await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n\n📌 *No accounts found. Click '➕ New Login'.*", parse_mode="Markdown")
+            await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n\n📌 *No accounts found. Click '➕ New Login' or send account JSON file.*", parse_mode="Markdown")
     elif user_text == "➕ New Login":
         USER_STATES[user_id] = "AWAITING_LOGIN_PHONE"
-        await update.message.reply_text("📱 **Enter BigBasket Mobile Number:**", parse_mode="Markdown")
+        await update.message.reply_text("📱 **Send your BigBasket Mobile Number (10-digit)**\n*(Or you can directly upload your .json session file here in chat)*", parse_mode="Markdown")
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
@@ -510,7 +522,7 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         elif data[0] == "adm_menu_userlist":
             users = rtdb.reference('users').get() or {}
             user_str = f"👥 **Total Users: {len(users)}**\n\n"
-            for uid, udata in list(users.items())[:35]: # Max 35 to prevent length limit
+            for uid, udata in list(users.items())[:35]:
                 uname = udata.get('username', 'N/A')
                 user_str += f"🆔 `{uid}` | @{uname}\n"
             await query.message.reply_text(user_str, parse_mode="Markdown")

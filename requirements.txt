@@ -6,3 +6,4 @@ requests
 qrcode
 pillow
 urllib3
+firebase-admin

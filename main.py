@@ -47,8 +47,8 @@ else:
 
 # --- ENHANCED DEVICE SPOOFING & HEADERS FOR OTP ---
 def _get_mock_location():
-    lat = 26.154523 + random.uniform(-0.005000, 0.005000)
-    lng = 85.891716 + random.uniform(-0.005000, 0.005000)
+    lat = 23.385085 + random.uniform(-0.002000, 0.002000)
+    lng = 85.286066 + random.uniform(-0.002000, 0.002000)
     return str(lat), str(lng)
 
 def _random_device_id() -> str:
@@ -58,30 +58,29 @@ def _build_app_headers() -> dict:
     lat, lng = _get_mock_location()
     return {
         "Host": "www.bigbasket.com",
-        "user-agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "user-agent": "Bigbasket-Android/8.35.0 (Android/14; Vivo I2017)",
         "content-type": "application/json; charset=utf-8",
         "accept": "application/json, text/plain, */*",
-        "accept-language": "en-US,en;q=0.9",
-        "origin": "https://www.bigbasket.com",
-        "referer": "https://www.bigbasket.com/",
+        "accept-encoding": "gzip, deflate",
         "x-requested-with": "in.bigbasket.android",
         "client-id": "android",
         "platform": "Bigbasket-Android",
         "version-code": "1590",
         "app-version": "8.35.0",
         "os-version": "14",
-        "manufacturer": "Google",
-        "model-name": "Pixel 7",
+        "manufacturer": "VIVO",
+        "model-name": "I2017",
         "swuid": _random_device_id(),
         "deviceid": _random_device_id(),
         "latitude": lat,
         "longitude": lng,
-        "connection": "keep-alive"
+        "connection": "keep-alive",
+        "referer": "https://www.bigbasket.com/"
     }
 
 def _build_headers(session: Dict) -> Dict[str, str]:
     h = {
-        "user-agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "user-agent": "Mozilla/5.0 (Linux; Android 14; I2017 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.163 Mobile Safari/537.36",
         "content-type": "application/json",
         "client-id": "portal",
         "platform": "Bigbasket-Android",
@@ -191,7 +190,6 @@ def increment_tx_count(user_id: int) -> int:
     except Exception:
         return 1
 
-# --- CONFIGS ---
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", 8053042225))
 BOT_TOKEN = "8791725918:AAEfdb0NlL7LFMYXzwD0LNjfZaWilJu_-Bk"
 
@@ -215,7 +213,6 @@ YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe"
 MERCHANT_NAME = "GBX"
 bot_app = None
 
-# Updated Bot Reply Keyboard (Removed My Accounts, New Login, Refer & Earn; Added Web Panel button)
 def load_dashboard_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")],
@@ -355,10 +352,19 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         tx_data = PENDING_TX.get(user_id)
         amount = tx_data["amount"] if tx_data else 10.0
         USER_STATES[user_id] = None
-        increment_tx_count(user_id)
+        tx_count = increment_tx_count(user_id)
+        
+        user_name = update.effective_user.full_name or update.effective_user.username or "N/A"
         
         if bot_app:
-            admin_msg = f"📥 **Payment Request**\n👤 User ID: `{user_id}`\n🔢 UTR: `{utr}`\n💰 Amount: ₹{amount}"
+            admin_msg = (
+                f"📥 **Payment Request**\n"
+                f"👤 User ID: `{user_id}`\n"
+                f"📛 User Name: `{user_name}`\n"
+                f"🔢 UTR: `{utr}`\n"
+                f"🆔 TX ID Count: `{tx_count}`\n"
+                f"💰 Amount: ₹{amount}"
+            )
             await bot_app.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=admin_msg,
@@ -408,6 +414,47 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
+async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global bot_app
+    query = update.callback_query
+    if query:
+        await query.answer()
+        data = query.data.split(":")
+        action = data[0]
+        
+        if action == "adm_accept":
+            target_user = int(data[1])
+            amount = float(data[2])
+            utr = data[3] if len(data) > 3 else "N/A"
+            if utr != "N/A":
+                add_used_utr(utr)
+            update_balance(target_user, amount)
+            await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
+            if bot_app:
+                try:
+                    await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!** ₹{amount} added to your balance.", parse_mode="Markdown")
+                except Exception:
+                    pass
+        elif action == "adm_reject":
+            target_user = int(data[1])
+            await query.message.edit_text(f"❌ Rejected payment request for User `{target_user}`.")
+            if bot_app:
+                try:
+                    await bot_app.bot.send_message(target_user, "⌛ **Payment Rejected!** Invalid UTR or details.", parse_mode="Markdown")
+                except Exception:
+                    pass
+
+async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    await query.answer()
+    USER_STATES[user_id] = "AWAITING_UTR"
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
+
 # --- FASTAPI SERVER & ENDPOINTS ---
 api_app = FastAPI()
 
@@ -422,12 +469,14 @@ def serve_index():
 def api_user_accounts(user_id: int):
     try:
         accs = rtdb.reference(f'accounts/{user_id}').get() or {}
+        active_sess = rtdb.reference(f'active_session/{user_id}/id').get()
         accounts_list = []
         for acc_id, acc_val in accs.items():
             accounts_list.append({
                 "id": acc_id,
                 "phone": acc_val.get('phone', 'N/A'),
-                "name": acc_val.get('name', 'BigBasket User')
+                "name": acc_val.get('name', 'BigBasket User'),
+                "active": (acc_id == active_sess)
             })
         return {"accounts": accounts_list}
     except Exception as e:
@@ -443,6 +492,7 @@ def api_set_active_session(user_id: int, acc_id: str):
     try:
         acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
         if acc_data:
+            acc_data['id'] = acc_id
             rtdb.reference(f'active_session/{user_id}').set(acc_data)
             return {"status": "success"}
     except Exception:
@@ -492,6 +542,7 @@ async def api_verify_otp(request: Request):
         'cookies': cookies
     }
     rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
+    rtdb.reference(f'active_session/{user_id}').set({**session_data, 'id': acc_id})
     return {"success": True}
 
 @api_app.post("/api/save-json")
@@ -513,6 +564,7 @@ async def api_save_json(request: Request):
         'cookies': json_data.get('cookies', {})
     }
     rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
+    rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
     return {"success": True}
 
 @api_app.on_event("startup")
@@ -531,6 +583,8 @@ async def startup_event():
             
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CommandHandler("admin", admin_command))
+            bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
+            bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*"))
             bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.ALL & ~filters.COMMAND, handle_text_messages))
             
             await bot_app.initialize()

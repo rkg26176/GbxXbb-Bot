@@ -5,8 +5,10 @@ import re
 import psycopg2
 import time
 import urllib.parse
+import qrcode
+import io
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
@@ -36,12 +38,20 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id BIGINT PRIMARY KEY,
-                balance REAL DEFAULT 0.0
+                balance REAL DEFAULT 5.0,
+                points REAL DEFAULT 0.0,
+                referred_by BIGINT DEFAULT NULL
             )
         ''')
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS used_utrs (
                 utr TEXT PRIMARY KEY
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS referrals (
+                referrer_id BIGINT,
+                referred_id BIGINT PRIMARY KEY
             )
         ''')
         cursor.close()
@@ -50,22 +60,22 @@ def init_db():
     except Exception as e:
         logging.error(f"Database init error: {e}")
 
-def get_balance(user_id: int) -> float:
+def get_user_data(user_id: int):
     try:
         conn = get_db_connection()
         if not conn:
-            return 0.0
+            return 5.0, 0.0
         cursor = conn.cursor()
-        cursor.execute("SELECT balance FROM users WHERE user_id = %s", (int(user_id),))
+        cursor.execute("SELECT balance, points FROM users WHERE user_id = %s", (int(user_id),))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
-        if row is not None and row[0] is not None:
-            return float(row[0])
-        return 0.0
+        if row is not None:
+            return float(row[0]), float(row[1])
+        return 5.0, 0.0
     except Exception as e:
-        logging.error(f"Error getting balance for user {user_id}: {e}")
-        return 0.0
+        logging.error(f"Error getting user data for {user_id}: {e}")
+        return 5.0, 0.0
 
 def update_balance(user_id: int, amount: float):
     try:
@@ -80,13 +90,34 @@ def update_balance(user_id: int, amount: float):
             new_bal = float(row[0]) + amount
             cursor.execute("UPDATE users SET balance = %s WHERE user_id = %s", (new_bal, int(user_id)))
         else:
-            cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, %s)", (int(user_id), amount))
+            cursor.execute("INSERT INTO users (user_id, balance, points) VALUES (%s, %s, 0.0)", (int(user_id), amount))
             
         cursor.close()
         conn.close()
         logging.info(f"Balance updated for {user_id}: +{amount}")
     except Exception as e:
         logging.error(f"Error updating balance for {user_id}: {e}")
+
+def update_points(user_id: int, points_to_add: float):
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return
+        cursor = conn.cursor()
+        cursor.execute("SELECT points FROM users WHERE user_id = %s", (int(user_id),))
+        row = cursor.fetchone()
+        
+        if row is not None:
+            new_pts = float(row[0]) + points_to_add
+            cursor.execute("UPDATE users SET points = %s WHERE user_id = %s", (new_pts, int(user_id)))
+        else:
+            cursor.execute("INSERT INTO users (user_id, balance, points) VALUES (%s, 5.0, %s)", (int(user_id), points_to_add))
+            
+        cursor.close()
+        conn.close()
+        logging.info(f"Points updated for {user_id}: +{points_to_add}")
+    except Exception as e:
+        logging.error(f"Error updating points for {user_id}: {e}")
 
 def get_all_user_ids():
     try:
@@ -140,9 +171,9 @@ TARGET_LINKS = {
     -1003862251237: "https://t.me/+O_-kEF2f5f1kMjdl"            
 }
 TARGET_LABELS = {
-    -1003332858806: "📢 Join GBX LOOT", 
-    -1003630519339: "📢 Join GBX EARN",
-    -1003197501531: "📢 Join GBX Zone", 
+    -1003332858806: "📢 GBX LOOT", 
+    -1003630519339: "📢 GBX EARN",
+    -1003197501531: "📢 GBX ZONE", 
     -1003862251237: "💬 Join Group Chat (GC)"
 }
 
@@ -157,10 +188,10 @@ bot_app = None
 checker_app = None
 
 def load_dashboard_menu():
-    # Mini App button completely removed
     return ReplyKeyboardMarkup([
         [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ New Login")],
-        [KeyboardButton("💰 Wallet"), KeyboardButton("🛠️ Customer Care")]
+        [KeyboardButton("💰 Wallet"), KeyboardButton("👥 Refer & Earn")],
+        [KeyboardButton("🛠️ Customer Care")]
     ], resize_keyboard=True)
 
 async def get_remaining_channels(user_id: int):
@@ -188,21 +219,55 @@ async def show_force_join_menu(update: Update, remaining: list):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    args = context.args
+    
     try:
         conn = get_db_connection()
         if conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (user_id, balance) VALUES (%s, 0.0) ON CONFLICT (user_id) DO NOTHING", (user_id,))
-            cursor.close()
-            conn.close()
+            cursor.execute("SELECT user_id FROM users WHERE user_id = %s", (user_id,))
+            exists = cursor.fetchone()
+            
+            if not exists:
+                cursor.execute("INSERT INTO users (user_id, balance, points) VALUES (%s, 5.0, 0.0)", (user_id,))
+                
+                if args and args[0].isdigit():
+                    referrer_id = int(args[0])
+                    if referrer_id != user_id:
+                        cursor.execute("SELECT 1 FROM referrals WHERE referred_id = %s", (user_id,))
+                        already_referred = cursor.fetchone()
+                        
+                        if not already_referred:
+                            cursor.execute("SELECT 1 FROM users WHERE user_id = %s", (referrer_id,))
+                            referrer_exists = cursor.fetchone()
+                            if referrer_exists:
+                                cursor.execute("INSERT INTO referrals (referrer_id, referred_id) VALUES (%s, %s)", (referrer_id, user_id))
+                                cursor.execute("UPDATE users SET referred_by = %s WHERE user_id = %s", (referrer_id, user_id))
+                                cursor.close()
+                                conn.close()
+                                
+                                update_points(referrer_id, 2.0)
+                                
+                                if bot_app:
+                                    try:
+                                        await bot_app.bot.send_message(
+                                            chat_id=referrer_id,
+                                            text=f"🎉 **New Successful Referral!**\n🎁 You earned **2 Points**!",
+                                            parse_mode="Markdown"
+                                        )
+                                    except Exception:
+                                        pass
+                else:
+                    cursor.close()
+                    conn.close()
     except Exception as e:
-        logging.error(f"Error inserting user on start: {e}")
+        logging.error(f"Error on start & referral logic: {e}")
 
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await show_force_join_menu(update, remaining)
         return
-    await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+    await update.message.reply_text("✨ **Dashboard Active!**\n🎁 Sign-up Bonus of ₹5 added to your wallet!", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
 async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -247,7 +312,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("⛔ *Access Revoked!*", reply_markup=ReplyKeyboardRemove())
         return
 
-    if user_text in ["📱 My Accounts", "➕ New Login", "💰 Wallet", "🛠️ Customer Care"]:
+    if user_text in ["📱 My Accounts", "➕ New Login", "💰 Wallet", "👥 Refer & Earn", "🛠️ Customer Care"]:
         USER_STATES[user_id] = None
 
     if USER_STATES.get(user_id) == "AWAITING_AMOUNT":
@@ -261,12 +326,21 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
             
             raw_upi_string = f"upi://pay?pa={YOUR_UPI_ID}&pn={MERCHANT_NAME}&am={amount:.2f}&cu=INR&tr={tx_ref}"
-            encoded_upi_string = urllib.parse.quote(raw_upi_string)
-            qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_upi_string}"
+            
+            # Pillow & Qrcode generator integration
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(raw_upi_string)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            bio = io.BytesIO()
+            bio.name = "qr.png"
+            img.save(bio, "PNG")
+            bio.seek(0)
             
             verify_btn = InlineKeyboardMarkup([[InlineKeyboardButton(text="🔄 Verify Payment (Enter UTR)", callback_data=f"ask_utr:{amount}")]])
             await update.message.reply_photo(
-                photo=qr_code_url,
+                photo=bio,
                 caption=f"📲 Pay ₹{amount:.2f}\n⚠️ *Payment karke niche button par UTR daalein.*",
                 reply_markup=verify_btn
             )
@@ -303,13 +377,24 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     if user_text == "💰 Wallet":
-        current_bal = get_balance(user_id)
+        current_bal, current_pts = get_user_data(user_id)
         USER_STATES[user_id] = "AWAITING_AMOUNT"
-        await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n📥 Enter amount to deposit (Min ₹10):", parse_mode="Markdown")
+        await update.message.reply_text(f"💳 **Balance:** `₹{current_bal:.2f}`\n⭐ **Points:** `{current_pts:.1f}`\n\n📥 Enter amount to deposit (Min ₹10):", parse_mode="Markdown")
+    elif user_text == "👥 Refer & Earn":
+        bot_username = context.bot.username
+        ref_link = f"https://t.me/{bot_username}?start={user_id}"
+        _, current_pts = get_user_data(user_id)
+        ref_text = (
+            f"👥 **Refer & Earn Program**\n\n"
+            f"🔗 Your Referral Link:\n`{ref_link}`\n\n"
+            f"📌 **Rule:** Share this link with friends. When a new user starts the bot using your link, you get **2 Points** instantly!\n"
+            f"⭐ Your Total Points: **{current_pts:.1f} Points**"
+        )
+        await update.message.reply_text(ref_text, parse_mode="Markdown")
     elif user_text == "🛠️ Customer Care":
         await update.message.reply_text("Contact Support: @gbx_support_bot")
     elif user_text == "📱 My Accounts":
-        current_bal = get_balance(user_id)
+        current_bal, _ = get_user_data(user_id)
         await update.message.reply_text(f"🆔 **Your Telegram ID:** `{user_id}`\n💰 **Wallet Balance:** `₹{current_bal:.2f}`\n\n📌 *No active linked sessions found.*", parse_mode="Markdown")
     elif user_text == "➕ New Login":
         await update.message.reply_text("ℹ️ *Account Login feature currently unavailable.*", parse_mode="Markdown")
@@ -339,7 +424,7 @@ async def checker_admin_action_handler(update: Update, context: ContextTypes.DEF
             await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
             if bot_app:
                 try: 
-                    new_total = get_balance(target_user)
+                    new_total, _ = get_user_data(target_user)
                     await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!**\nBalance Added: ₹{amount}\nTotal Balance: ₹{new_total}")
                 except Exception as e:
                     logging.error(f"User notify error: {e}")
@@ -410,9 +495,37 @@ def home():
 @api_app.get("/api/user-balance")
 def get_user_api_balance(user_id: int = 0):
     if user_id > 0:
-        bal = get_balance(user_id)
-        return JSONResponse({"user_id": user_id, "balance": float(bal)})
-    return JSONResponse({"user_id": 0, "balance": 0.0})
+        bal, pts = get_user_data(user_id)
+        return JSONResponse({"user_id": user_id, "balance": float(bal), "points": float(pts)})
+    return JSONResponse({"user_id": 0, "balance": 0.0, "points": 0.0})
+
+@api_app.get("/api/place-order")
+def place_order_api(user_id: int = 0, amount: float = 6.0):
+    if user_id <= 0:
+        return JSONResponse({"success": False, "message": "Invalid User ID"})
+    
+    current_bal, _ = get_user_data(user_id)
+    
+    if current_bal >= amount:
+        new_bal = current_bal - amount
+        try:
+            conn = get_db_connection()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET balance = %s WHERE user_id = %s", (new_bal, int(user_id)))
+                cursor.close()
+                conn.close()
+                logging.info(f"Deducted ₹{amount} for order from user {user_id}. New balance: {new_bal}")
+        except Exception as e:
+            logging.error(f"Error deducting balance for user {user_id}: {e}")
+            return JSONResponse({"success": False, "message": "Database error processing payment."})
+            
+        return JSONResponse({"success": True, "new_balance": float(new_bal)})
+    else:
+        return JSONResponse({
+            "success": False, 
+            "message": f"Your current balance is ₹{current_bal:.2f}. Required ₹{amount:.2f}. Please add money to wallet!"
+        })
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -472,4 +585,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(api_app, host="0.0.0.0", port=port)
-            

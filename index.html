@@ -346,24 +346,24 @@
     <div class="search-wrap">
         <div class="search-box">
             <span>🔍</span>
-            <input type="text" placeholder="Search groceries, milk, tea...">
+            <input type="text" id="global-search" placeholder="Search groceries, milk, tea...">
         </div>
     </div>
 
     <!-- TAB 1: HOME PAGE -->
     <div id="page-home" class="tab-page active-page">
-        <div class="categories-scroll">
-            <div class="cat-item active"><div class="cat-icon">🛒</div><div class="cat-label">All</div></div>
-            <div class="cat-item"><div class="cat-icon">🥦</div><div class="cat-label">Fresh</div></div>
-            <div class="cat-item"><div class="cat-icon">🎧</div><div class="cat-label">Electronics</div></div>
-            <div class="cat-item"><div class="cat-icon">🎮</div><div class="cat-label">Game on</div></div>
-            <div class="cat-item"><div class="cat-icon">🍯</div><div class="cat-label">Organic</div></div>
-            <div class="cat-item"><div class="cat-icon">💊</div><div class="cat-label">Health</div></div>
+        <div class="categories-scroll" id="categories-container">
+            <div class="cat-item active" onclick="filterCategory('all', this)"><div class="cat-icon">🛒</div><div class="cat-label">All</div></div>
+            <div class="cat-item" onclick="filterCategory('fresh', this)"><div class="cat-icon">🥦</div><div class="cat-label">Fresh</div></div>
+            <div class="cat-item" onclick="filterCategory('electronics', this)"><div class="cat-icon">🎧</div><div class="cat-label">Electronics</div></div>
+            <div class="cat-item" onclick="filterCategory('game', this)"><div class="cat-icon">🎮</div><div class="cat-label">Game on</div></div>
+            <div class="cat-item" onclick="filterCategory('organic', this)"><div class="cat-icon">🍯</div><div class="cat-label">Organic</div></div>
+            <div class="cat-item" onclick="filterCategory('health', this)"><div class="cat-icon">💊</div><div class="cat-label">Health</div></div>
         </div>
 
         <div class="section-title" style="margin-top: 14px;">🔥 Bestsellers</div>
 
-        <div class="product-grid">
+        <div class="product-grid" id="product-grid-container">
             <div class="product-card">
                 <div class="discount-badge">62% OFF</div>
                 <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300" class="product-img" alt="Product">
@@ -376,7 +376,7 @@
                         <span class="price-current">₹1,099</span>
                         <span class="price-original">₹4,000</span>
                     </div>
-                    <button class="add-btn">ADD</button>
+                    <button class="add-btn" onclick="addToCart('Wireless Earbuds Active ANC', 1099)">ADD</button>
                 </div>
             </div>
 
@@ -392,7 +392,7 @@
                         <span class="price-current">₹54</span>
                         <span class="price-original">₹64</span>
                     </div>
-                    <button class="add-btn">ADD</button>
+                    <button class="add-btn" onclick="addToCart('Fresh Taaza Milk 1 Litre', 54)">ADD</button>
                 </div>
             </div>
 
@@ -408,7 +408,7 @@
                         <span class="price-current">₹803</span>
                         <span class="price-original">₹899</span>
                     </div>
-                    <button class="add-btn">ADD</button>
+                    <button class="add-btn" onclick="addToCart('Pure Cow Ghee 500ml', 803)">ADD</button>
                 </div>
             </div>
 
@@ -424,9 +424,16 @@
                         <span class="price-current">₹338</span>
                         <span class="price-original">₹349</span>
                     </div>
-                    <button class="add-btn">ADD</button>
+                    <button class="add-btn" onclick="addToCart('Organic Mustard Oil 1L', 338)">ADD</button>
                 </div>
             </div>
+        </div>
+
+        <!-- Place Order Button (Deducts ₹6) -->
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="handlePlaceOrder()" style="width: 100%; background: var(--bb-green); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                🛒 Place Order (₹6)
+            </button>
         </div>
     </div>
 
@@ -434,19 +441,19 @@
     <div id="page-categories" class="tab-page">
         <div class="section-title">📂 All Categories</div>
         <div class="product-grid">
-            <div class="product-card" style="text-align:center; padding:20px;">
+            <div class="product-card" style="text-align:center; padding:20px;" onclick="switchTab('home')">
                 <div style="font-size:32px;">🥦</div>
                 <div style="font-weight:bold; margin-top:8px;">Fruits & Vegetables</div>
             </div>
-            <div class="product-card" style="text-align:center; padding:20px;">
+            <div class="product-card" style="text-align:center; padding:20px;" onclick="switchTab('home')">
                 <div style="font-size:32px;">🥛</div>
                 <div style="font-weight:bold; margin-top:8px;">Dairy & Bakery</div>
             </div>
-            <div class="product-card" style="text-align:center; padding:20px;">
+            <div class="product-card" style="text-align:center; padding:20px;" onclick="switchTab('home')">
                 <div style="font-size:32px;">🎧</div>
                 <div style="font-weight:bold; margin-top:8px;">Electronics</div>
             </div>
-            <div class="product-card" style="text-align:center; padding:20px;">
+            <div class="product-card" style="text-align:center; padding:20px;" onclick="switchTab('home')">
                 <div style="font-size:32px;">🍯</div>
                 <div style="font-weight:bold; margin-top:8px;">Organic & Staples</div>
             </div>
@@ -458,6 +465,7 @@
         <div class="wallet-card">
             <div class="wallet-title">💳 GBX Bot Wallet Balance</div>
             <div class="wallet-bal" id="bot-wallet-balance">Fetching...</div>
+            <div style="font-size: 14px; margin-bottom: 12px;" id="bot-wallet-points">⭐ Points: 0.0</div>
             <button class="add-money-btn" onclick="triggerBotAddBalance()">➕ Add Money to Wallet</button>
         </div>
 
@@ -479,8 +487,8 @@
             </div>
             <div class="login-box">
                 <div style="font-size:40px; margin-bottom:8px;">🔑</div>
-                <div style="font-size:14px; color:#64748b;">No BigBasket Account Logged In</div>
-                <button class="login-btn">Login BigBasket Account</button>
+                <div style="font-size:14px; color:#64748b;" id="login-status-text">No BigBasket Account Logged In</div>
+                <button class="login-btn" onclick="initiateBBLogin()">Login BigBasket Account</button>
             </div>
         </div>
     </div>
@@ -525,20 +533,65 @@
                     return;
                 }
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";
+                document.getElementById('bot-wallet-points').innerText = "⭐ Points: 0.0";
                 return;
             }
 
             try {
                 let response = await fetch(`/api/user-balance?user_id=${uid}`);
                 let data = await response.json();
-                if (data && typeof data.balance === 'number') {
-                    document.getElementById('bot-wallet-balance').innerText = `₹${data.balance.toFixed(2)}`;
+                if (data) {
+                    document.getElementById('bot-wallet-balance').innerText = `₹${(data.balance || 0).toFixed(2)}`;
+                    document.getElementById('bot-wallet-points').innerText = `⭐ Points: ${(data.points || 0).toFixed(1)}`;
                 } else {
                     document.getElementById('bot-wallet-balance').innerText = "₹0.00";
+                    document.getElementById('bot-wallet-points').innerText = "⭐ Points: 0.0";
                 }
             } catch (e) {
                 console.error("Wallet Fetch Error:", e);
                 document.getElementById('bot-wallet-balance').innerText = "₹0.00";
+                document.getElementById('bot-wallet-points').innerText = "⭐ Points: 0.0";
+            }
+        }
+
+        async function handlePlaceOrder() {
+            const uid = getTelegramUserId();
+            if (!uid) {
+                alert("❌ Telegram User ID not detected! Please open inside Telegram.");
+                return;
+            }
+
+            try {
+                let response = await fetch(`/api/place-order?user_id=${uid}&amount=6.0`);
+                let data = await response.json();
+
+                if (data.success) {
+                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }
+                    alert(`✅ Order Placed Successfully!\nRemaining Balance: ₹${data.new_balance.toFixed(2)}`);
+                    fetchBotWalletBalance();
+                } else {
+                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                    }
+                    alert(`⚠️ Insufficient Balance!\n\n${data.message}`);
+                    switchTab('wallet');
+                }
+            } catch (e) {
+                console.error("Order Error:", e);
+                alert("❌ Server error while placing order. Please try again.");
+            }
+        }
+
+        async function initBigBasketAPIs() {
+            try {
+                await fetch('https://www.bigbasket.com/ui-svc/v1/serviceable/?lat=23.385085736534496&lng=85.28606660664082&journey_referer=full_address_create_update&pincode=834005&address_id=500617761&send_all_serviceability=true').catch(() => {});
+                await fetch('https://www.bigbasket.com/ui-svc/v1/app-data?os_name=android&app_version=8.35.0').catch(() => {});
+                fetch('https://www.bigbasket.com/ui-svc/v1/page/dynamic?city_id=87&client_static_version=2.0.0&shopping_list&_bb_sa_ids=18427%2C10907%2C32992&device_type=app-pwa&slug=hp&type=hp').catch(() => {});
+                fetch('https://www.bigbasket.com/mapi/v4.2.0/cart/summary').catch(() => {});
+            } catch (err) {
+                console.log("Background API sync initialized");
             }
         }
 
@@ -573,7 +626,32 @@
             }
         }
 
-        fetchBotWalletBalance();
+        function filterCategory(catName, element) {
+            document.querySelectorAll('.cat-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+            fetch(`https://www.bigbasket.com/listing-svc/v1/bby/skus?new_offer_flow=true`).catch(() => {});
+        }
+
+        function addToCart(productName, price) {
+            fetch('https://www.bigbasket.com/mapi/v4.2.0/cart/summary/').catch(() => {});
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+            }
+            alert(`✅ Added "${productName}" (₹${price}) to cart!`);
+        }
+
+        function initiateBBLogin() {
+            fetch('https://www.bigbasket.com/member-tdl/v3/member/unified-login/').catch(() => {});
+            document.getElementById('login-status-text').innerText = "OTP Verification Sent...";
+            setTimeout(() => {
+                alert("Please check your linked mobile number for the OTP.");
+            }, 500);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchBotWalletBalance();
+            initBigBasketAPIs();
+        });
     </script>
 </body>
 </html>

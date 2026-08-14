@@ -663,6 +663,48 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
+async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global bot_app
+    query = update.callback_query
+    if query:
+        await query.answer()
+        data = query.data.split(":")
+        action = data[0]
+        
+        if action == "adm_gen_coupon":
+            user_id = query.from_user.id
+            if user_id != ADMIN_CHAT_ID:
+                return
+            ADMIN_COUPON_STEPS[user_id] = {"step": "AMOUNT"}
+            await query.message.reply_text("🎟️ **Coupon Generator Started**\n\nKripya coupon ka amount enter karein (₹ mein):", parse_mode="Markdown")
+        
+        elif action == "user_claim_coupon":
+            user_id = query.from_user.id
+            USER_STATES[user_id] = "CLAIMING_COUPON"
+            await query.message.reply_text("🎁 **Apna 6-digit coupon code yahan type karke bhejein:**", parse_mode="Markdown")
+
+        elif action == "adm_accept":
+            target_user = int(data[1])
+            amount = float(data[2])
+            utr = data[3] if len(data) > 3 else "N/A"
+            if utr != "N/A":
+                add_used_utr(utr)
+            update_balance(target_user, amount)
+            await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
+            if bot_app:
+                try:
+                    await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!** ₹{amount} added to your balance.", parse_mode="Markdown")
+                except Exception:
+                    pass
+        elif action == "adm_reject":
+            target_user = int(data[1])
+            await query.message.edit_text(f"❌ Rejected payment request for User `{target_user}`.")
+            if bot_app:
+                try:
+                    await bot_app.bot.send_message(target_user, "⌛ **Payment Rejected!** Invalid UTR or details.", parse_mode="Markdown")
+                except Exception:
+                    pass
+
 async def account_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

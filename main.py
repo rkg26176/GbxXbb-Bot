@@ -204,9 +204,11 @@ YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe"
 MERCHANT_NAME = "GBX"
 bot_app = None
 
+# --- 4-DOT REPLY KEYBOARD MENU ---
 def load_dashboard_menu():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")]
+        [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")],
+        [KeyboardButton("🌐 Web Panel")]
     ], resize_keyboard=True)
 
 async def get_remaining_channels(user_id: int):
@@ -238,7 +240,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Your account is banned from using this bot.")
         return
 
-    # Reset any active states on /start
     USER_STATES[user_id] = None
     if user_id in ADMIN_COUPON_STEPS:
         ADMIN_COUPON_STEPS.pop(user_id, None)
@@ -361,7 +362,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         await show_force_join_menu(update, remaining)
         return
 
-    # --- INTERRUPT & RESET STATE ON NEW MENU CLICK / COMMAND ---
     if user_text == "💰 Balance":
         USER_STATES[user_id] = None
         if user_id in ADMIN_COUPON_STEPS:
@@ -392,6 +392,13 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
         support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
         await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
+        return
+
+    elif user_text == "🌐 Web Panel":
+        USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+        await panel_command(update, context)
         return
 
     state = USER_STATES.get(user_id)
@@ -675,9 +682,9 @@ async def startup_event():
         try:
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
             
+            # Blue menu command list (/panel removed from blue menu)
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
-                BotCommand("panel", "Open HTML Web Panel"),
                 BotCommand("admin", "Admin Control Panel")
             ]
             await bot_app.bot.set_my_commands(commands)

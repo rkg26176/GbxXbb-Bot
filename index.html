@@ -8,11 +8,11 @@
     <style>
         :root {
             --bb-green: #10b981;
-            --bg-color: #f3f4f6;
-            --text-color: #1f2937;
-            --card-bg: #ffffff;
-            --border-color: #e5e7eb;
-            --subtext-color: #6b7280;
+            --bg-color: #090d16;
+            --text-color: #f8fafc;
+            --card-bg: #111827;
+            --border-color: #1f2937;
+            --subtext-color: #9ca3af;
         }
 
         * {
@@ -40,7 +40,6 @@
             justify-content: center;
             padding: 24px;
             text-align: center;
-            color: #fff;
         }
         .telegram-btn {
             background: #0088cc; color: white; border: none; padding: 14px 28px;
@@ -48,182 +47,134 @@
             display: inline-block; margin-top: 15px;
         }
 
-        /* Portal Header (Login / Selector View) */
-        .portal-landing {
-            padding: 20px;
-            max-width: 480px;
-            margin: 0 auto;
-        }
         .portal-header {
-            padding: 20px 16px;
-            background: #111827;
-            color: #fff;
-            border-radius: 16px;
+            padding: 20px 16px 14px 16px;
+            background: linear-gradient(180deg, #111827 0%, #090d16 100%);
+            border-bottom: 1px solid var(--border-color);
             text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 14px;
         }
         .portal-header h2 {
             font-size: 18px;
             font-weight: 900;
-            color: #10b981;
+            background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             letter-spacing: 1px;
             text-transform: uppercase;
         }
 
-        .section-title { font-size: 16px; font-weight: 800; margin-bottom: 10px; color: #111827; }
+        .tab-page { display: none; padding: 16px; }
+        .tab-page.active-page { display: block; }
         
+        .section-header-wrap { margin-bottom: 10px; }
+        .section-title { font-size: 17px; font-weight: 800; color: #f8fafc; }
+        .section-subtitle { font-size: 12px; color: var(--subtext-color); margin-top: 2px; }
+
         .accounts-scroll-box {
-            max-height: 240px;
+            min-height: 200px;
+            max-height: 260px;
             overflow-y: auto;
-            background: #fff;
+            background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 14px;
-            padding: 12px;
+            border-radius: 16px;
+            padding: 14px;
             margin-bottom: 16px;
         }
 
         .account-option-card {
-            background: #f9fafb; border: 1px solid var(--border-color); border-radius: 10px;
-            padding: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;
+            background: #1f2937; border: 1px solid var(--border-color); border-radius: 12px;
+            padding: 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
         }
-        .account-option-card.active-switch { border-color: var(--bb-green); background: #ecfdf5; }
+        .account-option-card.active-switch { border-color: var(--bb-green); background: #13221c; }
         .account-info { display: flex; align-items: center; gap: 10px; }
         .account-icon {
-            width: 36px; height: 36px; background: #e5e7eb; border-radius: 50%;
+            width: 38px; height: 38px; background: #111827; border-radius: 50%;
             display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--bb-green);
         }
-        .acc-name { font-weight: 700; font-size: 14px; color: #111827; }
+        .acc-name { font-weight: 700; font-size: 14px; color: #f8fafc; }
         .acc-phone { font-size: 11px; color: var(--subtext-color); margin-top: 2px; }
         
         .switch-btn {
-            background: #10b981; color: #fff; border: none;
-            padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;
+            background: #eab308; color: #000; border: none;
+            padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;
+        }
+        .account-option-card.active-switch .switch-btn { background: var(--bb-green); color: white; }
+
+        .empty-accounts {
+            text-align: center; color: var(--subtext-color); font-size: 13px; padding: 30px 0; font-style: italic;
         }
 
         .main-action-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 16px;
+            display: flex; flex-direction: column; gap: 10px;
         }
         .primary-action-btn {
-            width: 100%; background: #ffffff; color: #10b981; border: 2px solid #10b981; padding: 14px;
-            border-radius: 12px; font-weight: 800; font-size: 14px; cursor: pointer; text-align: center;
+            width: 100%; background: #111827; color: var(--bb-green); border: 2px solid var(--bb-green); padding: 14px;
+            border-radius: 14px; font-weight: 800; font-size: 14px; cursor: pointer; text-align: center;
         }
-        .primary-action-btn:hover { background: #10b981; color: white; }
-        .without-login-btn {
-            background: #374151; color: #fff; border: none;
-        }
+        .primary-action-btn:hover { background: var(--bb-green); color: white; }
+        .without-login-btn { background: #374151; color: #fff; border-color: #4b5563; }
 
-        /* Next Page Dashboard View (BigBasket Style) */
+        /* Dashboard View (BigBasket Interface) */
         #page-dashboard {
-            display: none;
-            background: #ffffff;
-            min-height: 100vh;
+            display: none; background: #ffffff; color: #1f2937; min-height: 100vh;
         }
         .bb-top-bar {
-            background: #10b981;
-            color: white;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            background: #10b981; color: white; padding: 12px 16px;
+            display: flex; align-items: center; justify-content: space-between;
         }
-        .bb-location {
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .bb-location { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .bb-profile-pill {
-            background: rgba(255,255,255,0.2);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px;
+            font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
         }
-        .bb-search-box {
-            padding: 12px 16px;
-            background: #f3f4f6;
-            border-bottom: 1px solid var(--border-color);
-        }
+        .bb-search-box { padding: 12px 16px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
         .bb-search-input {
-            width: 100%;
-            padding: 10px 14px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: #fff;
-            font-size: 14px;
-            outline: none;
+            width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; font-size: 14px; outline: none;
         }
         .bb-nav-icons {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            padding: 16px;
-            text-align: center;
-            background: #fff;
-            border-bottom: 8px solid #f3f4f6;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px; text-align: center; background: #fff; border-bottom: 8px solid #f3f4f6;
         }
-        .bb-icon-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #374151;
-            cursor: pointer;
-        }
+        .bb-icon-item { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; }
         .bb-icon-circle {
-            width: 48px;
-            height: 48px;
-            background: #f3f4f6;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        .bb-menu-list {
-            background: #fff;
+            width: 48px; height: 48px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;
         }
         .bb-menu-item {
-            padding: 16px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-weight: 600;
-            font-size: 15px;
-            color: #1f2937;
-            cursor: pointer;
+            padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 15px; color: #1f2937; cursor: pointer;
         }
 
         /* Modal Popups */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center; padding: 20px;
+            background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; padding: 20px;
         }
         .modal-box {
-            background: #fff; border-radius: 16px;
-            width: 100%; max-width: 380px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px;
+            width: 100%; max-width: 380px; padding: 20px; color: #f8fafc; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
-        .modal-box h3 { font-size: 16px; margin-bottom: 12px; color: #111827; font-weight: 700; }
+        .modal-box h3 { font-size: 16px; margin-bottom: 12px; color: #f8fafc; font-weight: 700; }
         .input-field {
-            width: 100%; background: #f9fafb; border: 1px solid var(--border-color); color: #111827;
+            width: 100%; background: #090d16; border: 1px solid var(--border-color); color: #f8fafc;
             padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; outline: none;
         }
         .modal-btn-row { display: flex; gap: 8px; }
         .modal-btn { flex: 1; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; }
-        .modal-btn-confirm { background: #10b981; color: white; }
-        .modal-btn-cancel { background: #e5e7eb; color: #374151; }
+        .modal-btn-confirm { background: var(--bb-green); color: white; }
+        .modal-btn-cancel { background: #374151; color: #9ca3af; }
+
+        .wallet-card {
+            background: linear-gradient(135deg, #059669, #047857); color: white;
+            padding: 24px; border-radius: 16px; box-shadow: 0 8px 20px rgba(5, 150, 105, 0.3); margin-bottom: 20px;
+        }
+        .wallet-title { font-size: 13px; opacity: 0.9; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .wallet-bal { font-size: 36px; font-weight: 900; margin: 10px 0 16px 0; }
+
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0; background: #111827;
+            display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid var(--border-color); z-index: 200;
+        }
+        .nav-tab { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--subtext-color); cursor: pointer; font-weight: 600; }
+        .nav-tab.active { color: var(--bb-green); }
     </style>
 </head>
 <body>
@@ -235,15 +186,19 @@
         <a href="https://t.me/gbx_x_bb_bot" class="telegram-btn" target="_blank">Go to Telegram Bot</a>
     </div>
 
-    <!-- LANDING / ACCOUNT SELECTOR VIEW -->
-    <div id="page-landing" class="portal-landing">
-        <div class="portal-header">
-            <h2>GBX X BB PANEL</h2>
+    <div class="portal-header">
+        <h2>GBX X BB PANEL</h2>
+    </div>
+
+    <!-- TAB 1: MY ACCOUNTS & LOGIN LANDING -->
+    <div id="page-accounts" class="tab-page active-page">
+        <div class="section-header-wrap">
+            <div class="section-title">📱 Connected Accounts</div>
+            <div class="section-subtitle">Switch and select your account</div>
         </div>
 
-        <div class="section-title">📱 Saved Accounts</div>
         <div class="accounts-scroll-box" id="selector-accounts-list">
-            <div style="text-align: center; color: var(--subtext-color); padding: 20px 0;">Loading accounts...</div>
+            <div class="empty-accounts">Loading accounts...</div>
         </div>
 
         <div class="main-action-buttons">
@@ -253,15 +208,20 @@
         </div>
     </div>
 
-    <!-- NEXT PAGE DASHBOARD VIEW (BigBasket Style Interface) -->
+    <!-- TAB 2: WALLET PAGE -->
+    <div id="page-wallet" class="tab-page">
+        <div class="wallet-card">
+            <div class="wallet-title">💳 GBX Bot Wallet Balance</div>
+            <div class="wallet-bal" id="bot-wallet-balance">₹0.00</div>
+            <button style="width: 100%; background: #ffffff; color: #064e3b; border: none; padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer;" onclick="triggerBotAddBalance()">➕ Add Money via Bot</button>
+        </div>
+    </div>
+
+    <!-- DASHBOARD VIEW (BigBasket Store Layout) -->
     <div id="page-dashboard">
         <div class="bb-top-bar">
-            <div class="bb-location" id="user-location-text">
-                📍 <span>Fetching location...</span>
-            </div>
-            <div class="bb-profile-pill" onclick="openAccountSelectorModal()">
-                👤 <span id="header-profile-name">Account</span> ▼
-            </div>
+            <div class="bb-location" id="user-location-text">📍 <span>Home - 834005</span></div>
+            <div class="bb-profile-pill" onclick="openAccountSelectorModal()">👤 <span id="header-profile-name">Account</span> ▼</div>
         </div>
         <div class="bb-search-box">
             <input type="text" class="bb-search-input" placeholder="Search for 'rice', 'dal', 'oil'...">
@@ -292,13 +252,11 @@
         </div>
     </div>
 
-    <!-- Account Switcher / Selector Modal (Triggered from Dashboard Profile) -->
+    <!-- Account Selector Modal -->
     <div id="accounts-modal" class="modal-overlay">
         <div class="modal-box">
             <h3>Switch / Select Account</h3>
-            <div id="modal-accounts-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 12px;">
-                <!-- Loaded dynamically -->
-            </div>
+            <div id="modal-accounts-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 12px;"></div>
             <button class="modal-btn modal-btn-cancel" style="width: 100%;" onclick="closeAccountSelectorModal()">Close</button>
         </div>
     </div>
@@ -328,11 +286,21 @@
     <div id="json-modal" class="modal-overlay">
         <div class="modal-box">
             <h3>📁 Login with JSON Session</h3>
-            <textarea id="modal-json-input" class="input-field" rows="4" placeholder="Paste session JSON or token format here..."></textarea>
+            <textarea id="modal-json-input" class="input-field" rows="4" placeholder="Paste valid session JSON or token format here..."></textarea>
             <div class="modal-btn-row">
                 <button class="modal-btn modal-btn-cancel" onclick="closeJsonModal()">Cancel</button>
                 <button class="modal-btn modal-btn-confirm" onclick="submitJsonSession()">Save Session</button>
             </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAVIGATION -->
+    <div class="bottom-nav">
+        <div class="nav-tab active" id="tab-accounts-btn" onclick="switchTab('accounts')">
+            <span>📱</span><span>My Accounts</span>
+        </div>
+        <div class="nav-tab" id="tab-wallet-btn" onclick="switchTab('wallet')">
+            <span>👛</span><span>Wallet</span>
         </div>
     </div>
 
@@ -363,13 +331,15 @@
             const container = document.getElementById('selector-accounts-list');
             if (!uid) return;
 
+            container.innerHTML = `<div class="empty-accounts">Loading accounts...</div>`;
+
             try {
                 let res = await fetch(`/api/user-accounts?user_id=${uid}`);
                 let data = await res.json();
                 userAccounts = data.accounts || [];
 
                 if (userAccounts.length === 0) {
-                    container.innerHTML = `<div style="text-align:center; color:var(--subtext-color); padding:15px;">No saved accounts found.</div>`;
+                    container.innerHTML = `<div class="empty-accounts">No accounts found.</div>`;
                 } else {
                     let html = '';
                     userAccounts.forEach((acc) => {
@@ -388,7 +358,6 @@
                     });
                     container.innerHTML = html;
 
-                    // If an active session is already set, auto-update header profile name
                     let activeAcc = userAccounts.find(a => a.active);
                     if (activeAcc) {
                         document.getElementById('header-profile-name').innerText = activeAcc.name.split(' ')[0];
@@ -396,6 +365,7 @@
                 }
             } catch (e) {
                 console.error(e);
+                container.innerHTML = `<div class="empty-accounts" style="color:#ef4444;">Failed to load accounts.</div>`;
             }
         }
 
@@ -404,32 +374,25 @@
             let res = await fetch(`/api/set-active-session?user_id=${uid}&acc_id=${id}`);
             let data = await res.json();
             if(data.status === 'success') {
+                closeAccountSelectorModal();
                 openDashboardView();
+                loadSelectorAccounts();
             } else {
                 alert("❌ Failed to switch session.");
             }
         }
 
         function openDashboardView() {
-            document.getElementById('page-landing').style.display = 'none';
+            document.getElementById('page-accounts').style.display = 'none';
+            document.getElementById('page-wallet').style.display = 'none';
+            document.querySelector('.bottom-nav').style.display = 'none';
             document.getElementById('page-dashboard').style.display = 'block';
-            fetchServiceableData();
-        }
-
-        async function fetchServiceableData() {
-            // Using service/location APIs or mock defaults based on provided context
-            try {
-                let res = await fetch('https://www.bigbasket.com/ui-svc/v1/serviceable/?lat=23.385085&lng=85.286066&journey_referer=full_address_create_update&pincode=834005&send_all_serviceability=true');
-                document.getElementById('user-location-text').innerHTML = `📍 <span>Home - 834005</span>`;
-            } catch(e) {
-                document.getElementById('user-location-text').innerHTML = `📍 <span>Ranchi, Jharkhand</span>`;
-            }
         }
 
         function openAccountSelectorModal() {
             const modalList = document.getElementById('modal-accounts-list');
             if (userAccounts.length === 0) {
-                modalList.innerHTML = `<div style="text-align:center; padding:15px; color:#6b7280;">No accounts found. Please login first.</div>`;
+                modalList.innerHTML = `<div style="text-align:center; padding:15px; color:#9ca3af;">No accounts found.</div>`;
             } else {
                 let html = '';
                 userAccounts.forEach(acc => {
@@ -447,9 +410,7 @@
             document.getElementById('accounts-modal').style.display = 'flex';
         }
 
-        function closeAccountSelectorModal() {
-            document.getElementById('accounts-modal').style.display = 'none';
-        }
+        function closeAccountSelectorModal() { document.getElementById('accounts-modal').style.display = 'none'; }
 
         // Modals
         function openOtpModal() { document.getElementById('otp-modal').style.display = 'flex'; document.getElementById('otp-step-1').style.display = 'block'; document.getElementById('otp-step-2').style.display = 'none'; }
@@ -523,9 +484,30 @@
             }
         }
 
+        async function fetchBotWalletBalance() {
+            const uid = getTelegramUserId();
+            if (!uid) return;
+            try {
+                let res = await fetch(`/api/user-balance?user_id=${uid}`);
+                let data = await res.json();
+                if (data) {
+                    document.getElementById('bot-wallet-balance').innerText = `₹${(data.balance || 0).toFixed(2)}`;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active-page'));
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`page-${tabName}`).classList.add('active-page');
+            document.getElementById(`tab-${tabName}-btn`).classList.add('active');
+            if (tabName === 'wallet') fetchBotWalletBalance();
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             checkTelegramEnvironment();
             loadSelectorAccounts();
+            fetchBotWalletBalance();
         });
     </script>
 </body>

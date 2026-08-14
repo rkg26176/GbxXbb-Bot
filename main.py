@@ -132,7 +132,7 @@ def bb_verify_otp(phone: str, otp: str):
     except Exception as e:
         return {"status": "fail"}, {}
 
-# --- USER HELPERS ---
+# --- USER & COUPON HELPERS ---
 def get_user_data(user_id: int):
     try:
         ref = rtdb.reference(f'users/{user_id}')
@@ -198,6 +198,7 @@ TARGET_LABELS = {
 }
 
 USER_STATES = {}
+ADMIN_COUPON_STEPS = {}
 PENDING_TX = {}
 YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe" 
 MERCHANT_NAME = "GBX"
@@ -278,7 +279,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 Broadcast", callback_data="adm_menu_broadcast")],
         [InlineKeyboardButton("👥 User List", callback_data="adm_menu_userlist"), InlineKeyboardButton("🚫 Ban ID", callback_data="adm_menu_ban")],
-        [InlineKeyboardButton("✅ Unban ID", callback_data="adm_menu_unban")]
+        [InlineKeyboardButton("✅ Unban ID", callback_data="adm_menu_unban")],
+        [InlineKeyboardButton("🎟️ Bot Coupon Generator", callback_data="adm_gen_coupon")]
     ])
     await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=admin_markup, parse_mode="Markdown")
 
@@ -301,6 +303,101 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         USER_STATES[user_id] = None
 
     state = USER_STATES.get(user_id)
+
+    # --- ADMIN COUPON GENERATOR FLOW ---
+    if user_id == ADMIN_CHAT_ID and user_id in ADMIN_COUPON_STEPS:
+        step_data = ADMIN_COUPON_STEPS[user_id]
+        step = step_data.get("step")
+
+        if step == "AMOUNT":
+            try:
+                amount = float(user_text)
+                if amount <= 0:
+                    raise ValueError
+                step_data["amount"] = amount
+                step_data["step"] = "CODE"
+                await update.message.reply_text("🔤 **Ab 6-digit ka unique coupon code (text) type karke bhejein:**", parse_mode="Markdown")
+                return
+            except ValueError:
+                await update.message.reply_text("❌ Kripya sahi numeric amount daalein.")
+                return
+
+        elif step == "CODE":
+            code = user_text.strip()
+            if len(code) != 6:
+                await update.message.reply_text("⚠️ Coupon code exact 6 characters/digits ka hona chahiye. Dobara bhejein:")
+                return
+            
+            # Check if coupon already exists
+            if rtdb.reference(f'coupons/{code}').get() is not None:
+                await update.message.reply_text("❌ Yeh coupon code pehle se exist karta hai. Doosra 6-digit code bhejein:")
+                return
+
+            step_data["code"] = code
+            step_data["step"] = "PASSWORD"
+            await update.message.reply_text("🔐 **Kripya security ke liye 4-digit PIN/Password enter karein (0000):**", parse_mode="Markdown")
+            return
+
+        elif step == "PASSWORD":
+            pin = user_text.strip()
+            if pin != "0000":
+                await update.message.reply_text("❌ Galat password! Coupon generation cancel ho gaya. Dobara admin panel se try karein.")
+                ADMIN_COUPON_STEPS.pop(user_id, None)
+                return
+
+            amount = step_data["amount"]
+            code = step_data["code"]
+            
+            # Save coupon to Firebase
+            rtdb.reference(f'coupons/{code}').set({
+                'amount': amount,
+                'used': False,
+                'used_by': None
+            })
+
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+            await update.message.reply_text(
+                f"✅ **Coupon Successfully Generated!**\n\n"
+                f"🎟️ Code: `{code}`\n"
+                f"💰 Amount: `₹{amount}`\n"
+                f"🔒 Status: Active (One-time use)",
+                parse_mode="Markdown"
+            )
+            return
+
+    # --- USER COUPON CLAIM FLOW ---
+    if state == "CLAIMING_COUPON":
+        code = user_text.strip()
+        USER_STATES[user_id] = None
+
+        coupon_ref = rtdb.reference(f'coupons/{code}')
+        coupon_data = coupon_ref.get()
+
+        if not coupon_data:
+            await update.message.reply_text("❌ **Invalid Coupon Code!** Aisa koi coupon exist nahi karta.")
+            return
+
+        if coupon_data.get('used', False):
+            await update.message.reply_text("❌ **Coupon Already Used!** Yeh coupon pehle hi redeem kiya ja chuka hai.")
+            return
+
+        amount = float(coupon_data.get('amount', 0))
+
+        # Mark coupon as used and tie it permanently to this user
+        coupon_ref.update({
+            'used': True,
+            'used_by': user_id
+        })
+
+        # Add balance to user
+        update_balance(user_id, amount)
+
+        await update.message.reply_text(
+            f"🎉 **Coupon Successfully Claimed!**\n\n"
+            f"💰 `₹{amount}` has been added to your balance permanently.",
+            parse_mode="Markdown"
+        )
+        return
 
     if state == "AWAITING_AMOUNT":
         try:
@@ -372,6 +469,10 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         bot_username = context.bot.username if context.bot else "gbx_x_bb_bot"
         ref_link = f"https://t.me/{bot_username}?start={user_id}"
         
+        balance_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Claim Amount via Coupon", callback_data="user_claim_coupon")]
+        ])
+
         balance_text = (
             f"💳 **Your Balance:** `₹{current_bal:.2f}`\n\n"
             f"👥 **Total Referrals:** `{total_refs}`\n"
@@ -379,7 +480,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             f"📥 **Enter amount to deposit (Min ₹10):**"
         )
         USER_STATES[user_id] = "AWAITING_AMOUNT"
-        await update.message.reply_text(balance_text, parse_mode="Markdown")
+        await update.message.reply_text(balance_text, reply_markup=balance_markup, parse_mode="Markdown")
 
     elif user_text == "🛠️ Customer Care":
         support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
@@ -412,7 +513,19 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         data = query.data.split(":")
         action = data[0]
         
-        if action == "adm_accept":
+        if action == "adm_gen_coupon":
+            user_id = query.from_user.id
+            if user_id != ADMIN_CHAT_ID:
+                return
+            ADMIN_COUPON_STEPS[user_id] = {"step": "AMOUNT"}
+            await query.message.reply_text("🎟️ **Coupon Generator Started**\n\nKripya coupon ka amount enter karein (₹ mein):", parse_mode="Markdown")
+        
+        elif action == "user_claim_coupon":
+            user_id = query.from_user.id
+            USER_STATES[user_id] = "CLAIMING_COUPON"
+            await query.message.reply_text("🎁 **Apna 6-digit coupon code yahan type karke bhejein:**", parse_mode="Markdown")
+
+        elif action == "adm_accept":
             target_user = int(data[1])
             amount = float(data[2])
             utr = data[3] if len(data) > 3 else "N/A"
@@ -445,7 +558,7 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI SERVER & API ENDPOINTS ---
+# --- FASTAPI SERVER & ENDPOINTS ---
 api_app = FastAPI()
 
 @api_app.get("/", response_class=HTMLResponse)
@@ -586,7 +699,7 @@ async def startup_event():
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CommandHandler("admin", admin_command))
             bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-            bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*"))
+            bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*|user_claim_coupon"))
             bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.ALL & ~filters.COMMAND, handle_text_messages))
             
             await bot_app.initialize()

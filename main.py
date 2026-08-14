@@ -79,6 +79,8 @@ def _build_app_headers() -> dict:
     }
 
 def _build_headers(session: Dict) -> Dict[str, str]:
+    token = session.get("token") or session.get("bbAuthToken", "")
+    tid = session.get("tid") or session.get("mId", "")
     h = {
         "user-agent": "Mozilla/5.0 (Linux; Android 14; I2017 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.163 Mobile Safari/537.36",
         "content-type": "application/json",
@@ -86,10 +88,8 @@ def _build_headers(session: Dict) -> Dict[str, str]:
         "platform": "Bigbasket-Android",
         "x-requested-with": "in.bigbasket.android",
     }
-    if session.get("tid"): h["tid"] = session["tid"]
-    if session.get("token"): h["token"] = session["token"]
-    if session.get("x-oztok"): h["x-oztok"] = session["x-oztok"]
-    if session.get("sid"): h["sid"] = session["sid"]
+    if tid: h["tid"] = str(tid)
+    if token: h["token"] = str(token)
     return h
 
 def fetch_bb_profile(session_data: dict) -> dict:
@@ -659,25 +659,37 @@ async def api_verify_otp(request: Request):
 
 @api_app.post("/api/save-json")
 async def api_save_json(request: Request):
-    data = await request.json()
-    user_id = data.get("user_id")
-    json_data = data.get("json_data")
-    
-    profile = fetch_bb_profile(json_data)
-    phone = profile.get("phone", json_data.get('phone', 'Imported'))
-    name = profile.get("name", "BigBasket Account")
-    
-    acc_id = secrets.token_hex(4)
-    session_payload = {
-        'phone': phone,
-        'name': name,
-        'token': json_data.get('token', ''),
-        'tid': json_data.get('tid', ''),
-        'cookies': json_data.get('cookies', {})
-    }
-    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
-    rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
-    return {"success": True}
+    try:
+        data = await request.json()
+        user_id = data.get("user_id")
+        json_data = data.get("json_data", data)
+        
+        token = json_data.get("bbAuthToken") or json_data.get("token") or json_data.get("sessionid") or ""
+        tid = json_data.get("mId") or json_data.get("tid") or secrets.token_hex(16)
+        cookies = json_data.get("cookies", {})
+        if not cookies and token:
+            cookies = {"sessionid": token, "bb_token": token}
+
+        temp_session = {'token': token, 'tid': str(tid), 'cookies': cookies}
+        profile = fetch_bb_profile(temp_session)
+        
+        phone = profile.get("phone", json_data.get('phone', 'Imported'))
+        name = profile.get("name", json_data.get('name', 'BigBasket Account'))
+        
+        acc_id = secrets.token_hex(4)
+        session_payload = {
+            'phone': phone,
+            'name': name,
+            'token': token,
+            'tid': str(tid),
+            'cookies': cookies,
+            'raw_json': json_data
+        }
+        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
+        rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 @api_app.on_event("startup")
 async def startup_event():

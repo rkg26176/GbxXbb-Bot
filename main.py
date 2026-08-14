@@ -206,8 +206,7 @@ bot_app = None
 
 def load_dashboard_menu():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")],
-        [KeyboardButton("🌐 Web Panel")]
+        [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")]
     ], resize_keyboard=True)
 
 async def get_remaining_channels(user_id: int):
@@ -238,6 +237,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_user_banned(user_id):
         await update.message.reply_text("❌ Your account is banned from using this bot.")
         return
+
+    # Reset any active states on /start
+    USER_STATES[user_id] = None
+    if user_id in ADMIN_COUPON_STEPS:
+        ADMIN_COUPON_STEPS.pop(user_id, None)
 
     args = context.args
     try:
@@ -276,6 +280,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Yeh command sirf admin ke liye hai!")
         return
 
+    USER_STATES[user_id] = None
+    ADMIN_COUPON_STEPS.pop(user_id, None)
+
     admin_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 Broadcast", callback_data="adm_menu_broadcast")],
         [InlineKeyboardButton("👥 User List", callback_data="adm_menu_userlist"), InlineKeyboardButton("🚫 Ban ID", callback_data="adm_menu_ban")],
@@ -294,7 +301,10 @@ async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_force_join_menu(update, remaining)
         return
 
-    # Use the provided GitHub hosted frontend URL for the Mini Web App
+    USER_STATES[user_id] = None
+    if user_id in ADMIN_COUPON_STEPS:
+        ADMIN_COUPON_STEPS.pop(user_id, None)
+
     mini_web_url = "https://rkg26176.github.io/GbxXbb-Bot/"
     panel_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=mini_web_url))]
@@ -346,11 +356,43 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
         await show_force_join_menu(update, remaining)
         return
 
-    if user_text in ["💰 Balance", "🛠️ Customer Care", "🌐 Web Panel"]:
+    # --- INTERRUPT & RESET STATE ON NEW MENU CLICK / COMMAND ---
+    if user_text == "💰 Balance":
         USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+
+        current_bal, total_refs = get_user_data(user_id)
+        bot_username = context.bot.username if context.bot else "gbx_x_bb_bot"
+        ref_link = f"https://t.me/{bot_username}?start={user_id}"
+        
+        balance_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Claim Amount via Coupon", callback_data="user_claim_coupon")]
+        ])
+
+        balance_text = (
+            f"💳 **Your Balance:** `₹{current_bal:.2f}`\n\n"
+            f"👥 **Total Referrals:** `{total_refs}`\n"
+            f"🔗 **Referral Link:**\n`{ref_link}`\n\n"
+            f"📥 **Enter amount to deposit (Min ₹10):**"
+        )
+        USER_STATES[user_id] = "AWAITING_AMOUNT"
+        await update.message.reply_text(balance_text, reply_markup=balance_markup, parse_mode="Markdown")
+        return
+
+    elif user_text == "🛠️ Customer Care":
+        USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+
+        support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
+        await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
+        return
 
     state = USER_STATES.get(user_id)
 
@@ -510,32 +552,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("⏳ **Payment Verification Pending!**")
         return
 
-    if user_text == "💰 Balance":
-        current_bal, total_refs = get_user_data(user_id)
-        bot_username = context.bot.username if context.bot else "gbx_x_bb_bot"
-        ref_link = f"https://t.me/{bot_username}?start={user_id}"
-        
-        balance_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎁 Claim Amount via Coupon", callback_data="user_claim_coupon")]
-        ])
-
-        balance_text = (
-            f"💳 **Your Balance:** `₹{current_bal:.2f}`\n\n"
-            f"👥 **Total Referrals:** `{total_refs}`\n"
-            f"🔗 **Referral Link:**\n`{ref_link}`\n\n"
-            f"📥 **Enter amount to deposit (Min ₹10):**"
-        )
-        USER_STATES[user_id] = "AWAITING_AMOUNT"
-        await update.message.reply_text(balance_text, reply_markup=balance_markup, parse_mode="Markdown")
-
-    elif user_text == "🛠️ Customer Care":
-        support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
-        await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
-
-    elif user_text == "🌐 Web Panel":
-        await panel_command(update, context)
-    else:
-        await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
+    await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
 async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_app
@@ -617,7 +634,7 @@ def api_user_accounts(user_id: int):
 @api_app.get("/api/user-balance")
 def api_user_balance(user_id: int):
     bal, _ = get_user_data(user_id)
-    return {"balance": bal}
+    return {"balance": float(bal)}
 
 @api_app.get("/api/set-active-session")
 def api_set_active_session(user_id: int, acc_id: str):

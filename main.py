@@ -284,6 +284,56 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=admin_markup, parse_mode="Markdown")
 
+async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if is_user_banned(user_id):
+        return
+
+    remaining = await get_remaining_channels(user_id)
+    if len(remaining) > 0:
+        await show_force_join_menu(update, remaining)
+        return
+
+    # Use the provided GitHub hosted frontend URL for the Mini Web App
+    mini_web_url = "https://rkg26176.github.io/GbxXbb-Bot/"
+    panel_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=mini_web_url))]
+    ])
+    
+    msg = await update.message.reply_text(
+        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel.\n⚠️ *This panel will auto-delete in 60 seconds.*",
+        reply_markup=panel_markup,
+        parse_mode="Markdown"
+    )
+
+    async def delete_after_60(message_obj):
+        await asyncio.sleep(60)
+        try:
+            await message_obj.delete()
+        except Exception:
+            pass
+
+    asyncio.create_task(delete_after_60(msg))
+
+async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    await query.answer()
+    
+    remaining = await get_remaining_channels(user_id)
+    if len(remaining) == 0:
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await query.message.reply_text("✅ **Access Granted! Welcome.**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+    else:
+        buttons = []
+        for target in remaining:
+            buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
+        buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
+        await query.message.edit_text(f"⚠️ Bache hue `{len(remaining)}` channels join karein:", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if is_user_banned(user_id):
@@ -328,7 +378,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
                 await update.message.reply_text("⚠️ Coupon code exact 6 characters/digits ka hona chahiye. Dobara bhejein:")
                 return
             
-            # Check if coupon already exists
             if rtdb.reference(f'coupons/{code}').get() is not None:
                 await update.message.reply_text("❌ Yeh coupon code pehle se exist karta hai. Doosra 6-digit code bhejein:")
                 return
@@ -348,7 +397,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             amount = step_data["amount"]
             code = step_data["code"]
             
-            # Save coupon to Firebase
             rtdb.reference(f'coupons/{code}').set({
                 'amount': amount,
                 'used': False,
@@ -383,13 +431,11 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
         amount = float(coupon_data.get('amount', 0))
 
-        # Mark coupon as used and tie it permanently to this user
         coupon_ref.update({
             'used': True,
             'used_by': user_id
         })
 
-        # Add balance to user
         update_balance(user_id, amount)
 
         await update.message.reply_text(
@@ -487,21 +533,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
 
     elif user_text == "🌐 Web Panel":
-        panel_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url="https://www.bigbasket.com"))]
-        ])
-        msg = await update.message.reply_text(
-            "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel.\n⚠️ *This panel will auto-delete in 60 seconds.*",
-            reply_markup=panel_markup,
-            parse_mode="Markdown"
-        )
-        async def delete_after_60(message_obj):
-            await asyncio.sleep(60)
-            try:
-                await message_obj.delete()
-            except Exception:
-                pass
-        asyncio.create_task(delete_after_60(msg))
+        await panel_command(update, context)
     else:
         await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
 
@@ -561,12 +593,9 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- FASTAPI SERVER & ENDPOINTS ---
 api_app = FastAPI()
 
-@api_app.get("/", response_class=HTMLResponse)
-def serve_index():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h3>index.html not found!</h3>"
+@api_app.get("/")
+def home():
+    return JSONResponse({"status": "ok", "service": "GBX Bot Server Running"})
 
 @api_app.get("/api/user-accounts")
 def api_user_accounts(user_id: int):
@@ -602,85 +631,24 @@ def api_set_active_session(user_id: int, acc_id: str):
         pass
     return {"status": "fail"}
 
-@api_app.get("/api/export-auth")
-def api_export_auth(user_id: int, acc_id: str):
-    try:
-        acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
-        if acc_data:
-            return {"json_data": acc_data}
-    except Exception:
-        pass
-    return {"json_data": None}
-
-@api_app.get("/api/delete-account")
-def api_delete_account(user_id: int, acc_id: str):
-    try:
-        rtdb.reference(f'accounts/{user_id}/{acc_id}').delete()
-        active_sess = rtdb.reference(f'active_session/{user_id}/id').get()
-        if active_sess == acc_id:
-            rtdb.reference(f'active_session/{user_id}').delete()
-        return {"status": "success"}
-    except Exception:
-        pass
-    return {"status": "fail"}
-
-@api_app.post("/api/send-otp")
-async def api_send_otp(request: Request):
-    data = await request.json()
-    phone = data.get("phone")
-    res = bb_send_otp(phone)
-    if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
-        return {"success": True}
-    return {"success": False, "message": res.get("message", "Failed to send OTP")}
-
-@api_app.post("/api/verify-otp")
-async def api_verify_otp(request: Request):
-    data = await request.json()
-    user_id = data.get("user_id")
-    phone = data.get("phone")
-    otp = data.get("otp")
+@api_app.get("/api/place-order")
+def place_order_api(user_id: int = 0, amount: float = 6.0):
+    if user_id <= 0:
+        return JSONResponse({"success": False, "message": "Invalid User ID"})
     
-    verify_res, cookies = bb_verify_otp(phone, otp)
-    token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
-    tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
-    
-    temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
-    profile = fetch_bb_profile(temp_session)
-    name = profile.get("name", "BigBasket User")
-    
-    acc_id = secrets.token_hex(4)
-    session_data = {
-        'phone': phone,
-        'name': name,
-        'token': token,
-        'tid': tid,
-        'cookies': cookies
-    }
-    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
-    rtdb.reference(f'active_session/{user_id}').set({**session_data, 'id': acc_id})
-    return {"success": True}
-
-@api_app.post("/api/save-json")
-async def api_save_json(request: Request):
-    data = await request.json()
-    user_id = data.get("user_id")
-    json_data = data.get("json_data")
-    
-    profile = fetch_bb_profile(json_data)
-    phone = profile.get("phone", json_data.get('phone', 'Imported'))
-    name = profile.get("name", "BigBasket Account")
-    
-    acc_id = secrets.token_hex(4)
-    session_payload = {
-        'phone': phone,
-        'name': name,
-        'token': json_data.get('token', ''),
-        'tid': json_data.get('tid', ''),
-        'cookies': json_data.get('cookies', {})
-    }
-    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
-    rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
-    return {"success": True}
+    current_bal, _ = get_user_data(user_id)
+    if current_bal >= amount:
+        new_bal = current_bal - amount
+        try:
+            rtdb.reference(f'users/{user_id}').update({'balance': new_bal})
+        except Exception:
+            return JSONResponse({"success": False, "message": "Database error processing payment."})
+        return JSONResponse({"success": True, "new_balance": float(new_bal)})
+    else:
+        return JSONResponse({
+            "success": False, 
+            "message": f"Your current balance is ₹{current_bal:.2f}. Required ₹{amount:.2f}."
+        })
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -692,12 +660,14 @@ async def startup_event():
             
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
+                BotCommand("panel", "Open HTML Web Panel"),
                 BotCommand("admin", "Admin Control Panel")
             ]
             await bot_app.bot.set_my_commands(commands)
             
             bot_app.add_handler(CommandHandler("start", start))
             bot_app.add_handler(CommandHandler("admin", admin_command))
+            bot_app.add_handler(CommandHandler("panel", panel_command))
             bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
             bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*|user_claim_coupon"))
             bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.ALL & ~filters.COMMAND, handle_text_messages))

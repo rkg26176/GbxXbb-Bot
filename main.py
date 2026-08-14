@@ -710,6 +710,17 @@ async def account_action_callback(update: Update, context: ContextTypes.DEFAULT_
             parse_mode="Markdown"
         )
 
+async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    await query.answer()
+    USER_STATES[user_id] = "AWAITING_UTR"
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
+
 # --- FASTAPI SERVER & ENDPOINTS ---
 api_app = FastAPI()
 

@@ -335,7 +335,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
             step_data["code"] = code
             step_data["step"] = "PASSWORD"
-            await update.message.reply_text("🔐 **Kripya security ke liye 4-digit PIN/Password enter karein (0000):**", parse_mode="Markdown")
+            await update.message.reply_text("🔐 **Kripya security ke liye 4-digit PIN/Password enter karein :**", parse_mode="Markdown")
             return
 
         elif step == "PASSWORD":

@@ -6,7 +6,6 @@ import time
 import asyncio
 import urllib.parse
 import secrets
-import base64
 import json
 import qrcode
 import io
@@ -15,7 +14,7 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, db as rtdb
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.error import TelegramError
@@ -204,10 +203,9 @@ YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe"
 MERCHANT_NAME = "GBX"
 bot_app = None
 
-# --- UPDATED REPLY KEYBOARD MENU WITH 5 OPTIONS ---
 def load_dashboard_menu():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("📱 My Accounts"), KeyboardButton("➕ Plus New Account")],
+        [KeyboardButton("📱 My Accounts"), KeyboardButton("Plus New Account")],
         [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")],
         [KeyboardButton("🌐 Web Panel")]
     ], resize_keyboard=True)
@@ -244,7 +242,7 @@ async def send_accounts_menu(update_or_query, user_id: int):
         text = "📱 **Your Saved Connected Accounts:**\n\n"
         
         if not accs:
-            text += "*(No accounts connected yet. Click '➕ Plus New Account' below)*\n"
+            text += "*(No accounts connected yet. Click 'Plus New Account' below)*\n"
         else:
             for acc_id, acc_val in accs.items():
                 is_active = (acc_id == active_sess)
@@ -261,8 +259,7 @@ async def send_accounts_menu(update_or_query, user_id: int):
                 ])
 
         buttons.append([
-            InlineKeyboardButton("➕ Plus New Account", callback_data="acc_add_menu"),
-            InlineKeyboardButton("👛 Wallet Balance", callback_data="acc_wallet")
+            InlineKeyboardButton("Plus New Account", callback_data="acc_add_menu")
         ])
         
         markup = InlineKeyboardMarkup(buttons)
@@ -284,31 +281,87 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in ADMIN_COUPON_STEPS:
         ADMIN_COUPON_STEPS.pop(user_id, None)
 
+    args = context.args
+    try:
+        user_ref = rtdb.reference(f'users/{user_id}')
+        user_data = user_ref.get()
+        if not user_data:
+            user_ref.set({'balance': 5.0, 'referral_count': 0, 'tx_count': 0, 'username': update.effective_user.username or "N/A"})
+            if args and args[0].isdigit():
+                referrer_id = int(args[0])
+                if referrer_id != user_id:
+                    ref_check = rtdb.reference(f'referrals/{user_id}').get()
+                    if not ref_check:
+                        referrer_ref = rtdb.reference(f'users/{referrer_id}')
+                        if referrer_ref.get():
+                            rtdb.reference(f'referrals/{user_id}').set(referrer_id)
+                            curr_refs = int(referrer_ref.get().get('referral_count', 0)) + 1
+                            curr_bal = float(referrer_ref.get().get('balance', 5.0)) + 2.0
+                            referrer_ref.update({'balance': curr_bal, 'referral_count': curr_refs})
+                            if bot_app:
+                                try:
+                                    await bot_app.bot.send_message(referrer_id, f"🎉 **New Referral!** ₹2 added to your balance!", parse_mode="Markdown")
+                                except Exception:
+                                    pass
+    except Exception as e:
+        logging.error(f"Start error: {e}")
+
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await show_force_join_menu(update, remaining)
         return
-    await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+    await update.message.reply_text("✨ **Dashboard Active!**\n🎁 Sign-up Bonus of ₹5 added to your balance!", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_CHAT_ID:
         await update.message.reply_text("⚠️ Yeh command sirf admin ke liye hai!")
         return
-    await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📢 Broadcast", callback_data="adm_menu_broadcast")]]))
+
+    USER_STATES[user_id] = None
+    ADMIN_COUPON_STEPS.pop(user_id, None)
+
+    admin_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Broadcast", callback_data="adm_menu_broadcast")],
+        [InlineKeyboardButton("👥 User List", callback_data="adm_menu_userlist"), InlineKeyboardButton("🚫 Ban ID", callback_data="adm_menu_ban")],
+        [InlineKeyboardButton("✅ Unban ID", callback_data="adm_menu_unban")],
+        [InlineKeyboardButton("🎟️ Bot Coupon Generator", callback_data="adm_gen_coupon")]
+    ])
+    await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=admin_markup, parse_mode="Markdown")
 
 async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if is_user_banned(user_id):
         return
+
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await show_force_join_menu(update, remaining)
         return
 
+    USER_STATES[user_id] = None
+    if user_id in ADMIN_COUPON_STEPS:
+        ADMIN_COUPON_STEPS.pop(user_id, None)
+
     mini_web_url = "https://rkg26176.github.io/GbxXbb-Bot/"
-    panel_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=mini_web_url))]])
-    await update.message.reply_text("🎛️ **HTML Web Panel Access:**", reply_markup=panel_markup, parse_mode="Markdown")
+    panel_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=mini_web_url))]
+    ])
+    
+    msg = await update.message.reply_text(
+        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel.\n⚠️ *This panel will auto-delete in 60 seconds.*",
+        reply_markup=panel_markup,
+        parse_mode="Markdown"
+    )
+
+    async def delete_after_60(message_obj):
+        await asyncio.sleep(60)
+        try:
+            await message_obj.delete()
+        except Exception:
+            pass
+
+    asyncio.create_task(delete_after_60(msg))
 
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -322,6 +375,8 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
         await show_force_join_menu(update, remaining)
         return
 
@@ -330,10 +385,10 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         await send_accounts_menu(update, user_id)
         return
 
-    elif user_text == "➕ Plus New Account":
+    elif user_text == "Plus New Account":
         USER_STATES[user_id] = "AWAITING_NEW_ACCOUNT_INPUT"
         await update.message.reply_text(
-            "➕ **Plus New Account**\n\n"
+            "**Plus New Account**\n\n"
             "Kripya apna **10-digit mobile number** (OTP login ke liye) ya apna **JSON Token** yahan type karke bhejein:",
             parse_mode="Markdown"
         )
@@ -341,28 +396,133 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
     elif user_text == "💰 Balance":
         USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+
         current_bal, total_refs = get_user_data(user_id)
-        await update.message.reply_text(f"💳 **Your Balance:** `₹{current_bal:.2f}`\n👥 **Total Referrals:** `{total_refs}`", parse_mode="Markdown")
+        bot_username = context.bot.username if context.bot else "gbx_x_bb_bot"
+        ref_link = f"https://t.me/{bot_username}?start={user_id}"
+        
+        balance_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Claim Amount via Coupon", callback_data="user_claim_coupon")]
+        ])
+
+        balance_text = (
+            f"💳 **Your Balance:** `₹{current_bal:.2f}`\n\n"
+            f"👥 **Total Referrals:** `{total_refs}`\n"
+            f"🔗 **Referral Link:**\n`{ref_link}`\n\n"
+            f"📥 **Enter amount to deposit (Min ₹10):**"
+        )
+        USER_STATES[user_id] = "AWAITING_AMOUNT"
+        await update.message.reply_text(balance_text, reply_markup=balance_markup, parse_mode="Markdown")
         return
 
     elif user_text == "🛠️ Customer Care":
         USER_STATES[user_id] = None
-        await update.message.reply_text("🛠️ Support: https://t.me/gbx_support_bot")
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+
+        support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
+        await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
         return
 
     elif user_text == "🌐 Web Panel":
         USER_STATES[user_id] = None
+        if user_id in ADMIN_COUPON_STEPS:
+            ADMIN_COUPON_STEPS.pop(user_id, None)
         await panel_command(update, context)
         return
 
     state = USER_STATES.get(user_id)
 
-    # --- TELEGRAM CHAT ACCOUNT ADDITION FLOW (OTP OR JSON) ---
+    if user_id == ADMIN_CHAT_ID and user_id in ADMIN_COUPON_STEPS:
+        step_data = ADMIN_COUPON_STEPS[user_id]
+        step = step_data.get("step")
+
+        if step == "AMOUNT":
+            try:
+                amount = float(user_text)
+                if amount <= 0:
+                    raise ValueError
+                step_data["amount"] = amount
+                step_data["step"] = "CODE"
+                await update.message.reply_text("🔤 **Ab 6-digit ka unique coupon code (text) type karke bhejein:**", parse_mode="Markdown")
+                return
+            except ValueError:
+                await update.message.reply_text("❌ Kripya sahi numeric amount daalein.")
+                return
+
+        elif step == "CODE":
+            code = user_text.strip()
+            if len(code) != 6:
+                await update.message.reply_text("⚠️ Coupon code exact 6 characters/digits ka hona chahiye. Dobara bhejein:")
+                return
+            
+            if rtdb.reference(f'coupons/{code}').get() is not None:
+                await update.message.reply_text("❌ Yeh coupon code pehle se exist karta hai. Doosra 6-digit code bhejein:")
+                return
+
+            step_data["code"] = code
+            step_data["step"] = "PASSWORD"
+            await update.message.reply_text("🔐 **Kripya security ke liye 4-digit PIN/Password enter karein :**", parse_mode="Markdown")
+            return
+
+        elif step == "PASSWORD":
+            pin = user_text.strip()
+            if pin != "0000":
+                await update.message.reply_text("❌ Galat password! Coupon generation cancel ho gaya. Dobara admin panel se try karein.")
+                ADMIN_COUPON_STEPS.pop(user_id, None)
+                return
+
+            amount = step_data["amount"]
+            code = step_data["code"]
+            
+            rtdb.reference(f'coupons/{code}').set({
+                'amount': amount,
+                'used': False,
+                'used_by': None
+            })
+
+            ADMIN_COUPON_STEPS.pop(user_id, None)
+            await update.message.reply_text(
+                f"✅ **Coupon Successfully Generated!**\n\n"
+                f"🎟️ Code: `{code}`\n"
+                f"💰 Amount: `₹{amount}`\n"
+                f"🔒 Status: Active (One-time use)",
+                parse_mode="Markdown"
+            )
+            return
+
+    if state == "CLAIMING_COUPON":
+        code = user_text.strip()
+        USER_STATES[user_id] = None
+
+        coupon_ref = rtdb.reference(f'coupons/{code}')
+        coupon_data = coupon_ref.get()
+
+        if not coupon_data:
+            await update.message.reply_text("❌ **Invalid Coupon Code!** Aisa koi coupon exist nahi karta.")
+            return
+
+        if coupon_data.get('used', False):
+            await update.message.reply_text("❌ **Coupon Already Used!** Yeh coupon pehle hi redeem kiya ja chuka hai.")
+            return
+
+        amount = float(coupon_data.get('amount', 0))
+        coupon_ref.update({'used': True, 'used_by': user_id})
+        update_balance(user_id, amount)
+
+        await update.message.reply_text(
+            f"🎉 **Coupon Successfully Claimed!**\n\n"
+            f"💰 `₹{amount}` has been added to your balance permanently.",
+            parse_mode="Markdown"
+        )
+        return
+
     if state == "AWAITING_NEW_ACCOUNT_INPUT":
         USER_STATES[user_id] = None
         cleaned_text = user_text.strip()
         
-        # Check if input is JSON Token
         if cleaned_text.startswith("{") and cleaned_text.endswith("}"):
             try:
                 parsed_json = json.loads(cleaned_text)
@@ -395,7 +555,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
                 await update.message.reply_text(f"❌ Invalid JSON format or token error: {e}")
                 return
 
-        # Check if input is 10-digit Phone Number for OTP
         elif re.match(r"^\d{10}$", cleaned_text):
             phone = cleaned_text
             res = bb_send_otp(phone)
@@ -436,6 +595,70 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         
         await update.message.reply_text(f"✅ **OTP Verified & Account Saved!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`", parse_mode="Markdown")
         await send_accounts_menu(update, user_id)
+        return
+
+    if state == "AWAITING_AMOUNT":
+        try:
+            amount = float(user_text)
+            if amount < 10.0:
+                await update.message.reply_text("❌ Min ₹10 required.")
+                return
+            USER_STATES[user_id] = None
+            tx_ref = f"GBX{user_id}X{random.randint(1000, 9999)}"
+            PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
+            
+            raw_upi_string = f"upi://pay?pa={YOUR_UPI_ID}&pn={MERCHANT_NAME}&am={amount:.2f}&cu=INR&tr={tx_ref}"
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(raw_upi_string)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            bio = io.BytesIO()
+            bio.name = "qr.png"
+            img.save(bio, "PNG")
+            bio.seek(0)
+            
+            verify_btn = InlineKeyboardMarkup([[InlineKeyboardButton(text="🔄 Verify Payment (Enter UTR)", callback_data=f"ask_utr:{amount}")]])
+            await update.message.reply_photo(photo=bio, caption=f"📲 Pay ₹{amount:.2f}\n⚠️ *Payment karke niche button par UTR daalein.*", reply_markup=verify_btn)
+            return
+        except ValueError:
+            await update.message.reply_text("❌ Numeric amount daalein.")
+            return
+
+    elif state == "AWAITING_UTR" or re.match(r"^\d{12}$", user_text.strip()):
+        utr = user_text.strip()
+        if not re.match(r"^\d{12}$", utr):
+            await update.message.reply_text("❌ Kripya sahi 12-digit ka UTR number bhejein.")
+            return
+        if is_utr_used(utr):
+            await update.message.reply_text("❌ This UTR is already used!")
+            return
+            
+        tx_data = PENDING_TX.get(user_id)
+        amount = tx_data["amount"] if tx_data else 10.0
+        USER_STATES[user_id] = None
+        tx_count = increment_tx_count(user_id)
+        user_name = update.effective_user.full_name or update.effective_user.username or "N/A"
+        
+        if bot_app:
+            admin_msg = (
+                f"📥 **Payment Request**\n"
+                f"👤 User ID: `{user_id}`\n"
+                f"📛 User Name: `{user_name}`\n"
+                f"🔢 UTR: `{utr}`\n"
+                f"🆔 TX ID Count: `{tx_count}`\n"
+                f"💰 Amount: ₹{amount}"
+            )
+            await bot_app.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=admin_msg,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("✅ Accept", callback_data=f"adm_accept:{user_id}:{amount}:{utr}"),
+                    InlineKeyboardButton("❌ Reject", callback_data=f"adm_reject:{user_id}:{utr}")
+                ]]),
+                parse_mode="Markdown"
+            )
+            await update.message.reply_text("⏳ **Payment Verification Pending!**")
         return
 
     await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
@@ -482,14 +705,10 @@ async def account_action_callback(update: Update, context: ContextTypes.DEFAULT_
     elif action == "acc_add_menu":
         USER_STATES[user_id] = "AWAITING_NEW_ACCOUNT_INPUT"
         await query.message.reply_text(
-            "➕ **Plus New Account**\n\n"
+            "**Plus New Account**\n\n"
             "Kripya apna **10-digit mobile number** (OTP login ke liye) ya apna **JSON Token** yahan type karke bhejein:",
             parse_mode="Markdown"
         )
-
-    elif action == "acc_wallet":
-        bal, refs = get_user_data(user_id)
-        await query.message.reply_text(f"💳 **Your Balance:** `₹{bal:.2f}`\n👥 **Referrals:** `{refs}`", parse_mode="Markdown")
 
 # --- FASTAPI SERVER & ENDPOINTS ---
 api_app = FastAPI()
@@ -535,7 +754,8 @@ def api_set_active_session(user_id: int, acc_id: str):
 @api_app.post("/api/send-otp")
 async def api_send_otp(request: Request):
     data = await request.json()
-    res = bb_send_otp(data.get("phone"))
+    phone = data.get("phone")
+    res = bb_send_otp(phone)
     if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
         return {"success": True}
     return {"success": False, "message": res.get("message", "Failed to send OTP")}
@@ -556,14 +776,7 @@ async def api_verify_otp(request: Request):
     name = profile.get("name", "BigBasket User")
     
     acc_id = secrets.token_hex(4)
-    session_data = {
-        'phone': phone,
-        'name': name,
-        'token': token,
-        'tid': tid,
-        'cookies': cookies,
-        'device_id': _random_device_id()
-    }
+    session_data = {'phone': phone, 'name': name, 'token': token, 'tid': tid, 'cookies': cookies, 'device_id': _random_device_id()}
     rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
     rtdb.reference(f'active_session/{user_id}').set({**session_data, 'id': acc_id})
     return {"success": True}
@@ -620,6 +833,8 @@ async def startup_event():
             bot_app.add_handler(CommandHandler("admin", admin_command))
             bot_app.add_handler(CommandHandler("panel", panel_command))
             bot_app.add_handler(CallbackQueryHandler(account_action_callback, pattern="acc_.*"))
+            bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
+            bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*|user_claim_coupon"))
             bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.ALL & ~filters.COMMAND, handle_text_messages))
             
             await bot_app.initialize()

@@ -204,7 +204,6 @@ YOUR_UPI_ID = "BHARATPE.8R0I1G1N4X31943@fbpe"
 MERCHANT_NAME = "GBX"
 bot_app = None
 
-# --- 4-DOT REPLY KEYBOARD MENU ---
 def load_dashboard_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("💰 Balance"), KeyboardButton("🛠️ Customer Care")],
@@ -326,25 +325,6 @@ async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     asyncio.create_task(delete_after_60(msg))
 
-async def verify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    await query.answer()
-    
-    remaining = await get_remaining_channels(user_id)
-    if len(remaining) == 0:
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-        await query.message.reply_text("✅ **Access Granted! Welcome.**", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
-    else:
-        buttons = []
-        for target in remaining:
-            buttons.append([InlineKeyboardButton(text=TARGET_LABELS[target], url=TARGET_LINKS[target])])
-        buttons.append([InlineKeyboardButton(text="🔄 Verify / Check Access", callback_data="verify_all_joins")])
-        await query.message.edit_text(f"⚠️ Bache hue `{len(remaining)}` channels join karein:", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
-
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if is_user_banned(user_id):
@@ -403,7 +383,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
     state = USER_STATES.get(user_id)
 
-    # --- ADMIN COUPON GENERATOR FLOW ---
     if user_id == ADMIN_CHAT_ID and user_id in ADMIN_COUPON_STEPS:
         step_data = ADMIN_COUPON_STEPS[user_id]
         step = step_data.get("step")
@@ -462,7 +441,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             )
             return
 
-    # --- USER COUPON CLAIM FLOW ---
     if state == "CLAIMING_COUPON":
         code = user_text.strip()
         USER_STATES[user_id] = None
@@ -479,12 +457,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             return
 
         amount = float(coupon_data.get('amount', 0))
-
-        coupon_ref.update({
-            'used': True,
-            'used_by': user_id
-        })
-
+        coupon_ref.update({'used': True, 'used_by': user_id})
         update_balance(user_id, amount)
 
         await update.message.reply_text(
@@ -535,7 +508,6 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         amount = tx_data["amount"] if tx_data else 10.0
         USER_STATES[user_id] = None
         tx_count = increment_tx_count(user_id)
-        
         user_name = update.effective_user.full_name or update.effective_user.username or "N/A"
         
         if bot_app:
@@ -655,24 +627,57 @@ def api_set_active_session(user_id: int, acc_id: str):
         pass
     return {"status": "fail"}
 
-@api_app.get("/api/place-order")
-def place_order_api(user_id: int = 0, amount: float = 6.0):
-    if user_id <= 0:
-        return JSONResponse({"success": False, "message": "Invalid User ID"})
+@api_app.post("/api/send-otp")
+async def api_send_otp(request: Request):
+    data = await request.json()
+    phone = data.get("phone")
+    res = bb_send_otp(phone)
+    if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
+        return {"success": True}
+    return {"success": False, "message": res.get("message", "Failed to send OTP")}
+
+@api_app.post("/api/verify-otp")
+async def api_verify_otp(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    phone = data.get("phone")
+    otp = data.get("otp")
     
-    current_bal, _ = get_user_data(user_id)
-    if current_bal >= amount:
-        new_bal = current_bal - amount
-        try:
-            rtdb.reference(f'users/{user_id}').update({'balance': new_bal})
-        except Exception:
-            return JSONResponse({"success": False, "message": "Database error processing payment."})
-        return JSONResponse({"success": True, "new_balance": float(new_bal)})
-    else:
-        return JSONResponse({
-            "success": False, 
-            "message": f"Your current balance is ₹{current_bal:.2f}. Required ₹{amount:.2f}."
-        })
+    verify_res, cookies = bb_verify_otp(phone, otp)
+    token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
+    tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
+    
+    temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
+    profile = fetch_bb_profile(temp_session)
+    name = profile.get("name", "BigBasket User")
+    
+    acc_id = secrets.token_hex(4)
+    session_data = {'phone': phone, 'name': name, 'token': token, 'tid': tid, 'cookies': cookies}
+    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
+    rtdb.reference(f'active_session/{user_id}').set({**session_data, 'id': acc_id})
+    return {"success": True}
+
+@api_app.post("/api/save-json")
+async def api_save_json(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    json_data = data.get("json_data")
+    
+    profile = fetch_bb_profile(json_data)
+    phone = profile.get("phone", json_data.get('phone', 'Imported'))
+    name = profile.get("name", "BigBasket Account")
+    
+    acc_id = secrets.token_hex(4)
+    session_payload = {
+        'phone': phone,
+        'name': name,
+        'token': json_data.get('token', ''),
+        'tid': json_data.get('tid', ''),
+        'cookies': json_data.get('cookies', {})
+    }
+    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
+    rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
+    return {"success": True}
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -681,8 +686,6 @@ async def startup_event():
     if TOKEN:
         try:
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
-            
-            # Blue menu command list (/panel removed from blue menu)
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
                 BotCommand("admin", "Admin Control Panel")

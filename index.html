@@ -50,28 +50,47 @@
             box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4); display: inline-block;
         }
 
+        .portal-header {
+            padding: 16px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .portal-header h2 { font-size: 16px; color: var(--bb-green); font-weight: 800; }
+
         .tab-page { display: none; padding: 16px; }
         .tab-page.active-page { display: block; }
         .section-title { font-size: 18px; font-weight: 800; margin-bottom: 14px; color: #f8fafc; letter-spacing: -0.3px; }
 
+        .accounts-scroll-box {
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
         .account-option-card {
             background: var(--card-bg); border: 2px solid var(--border-color); border-radius: 14px;
-            padding: 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;
+            padding: 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;
         }
         .account-option-card.active-switch { border-color: var(--bb-green); background: #13221c; }
-        .account-info { display: flex; align-items: center; gap: 14px; }
+        .account-info { display: flex; align-items: center; gap: 12px; }
         .account-icon {
-            width: 44px; height: 44px; background: #1f2937; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--bb-green);
+            width: 40px; height: 40px; background: #1f2937; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--bb-green);
         }
-        .account-details .acc-name { font-weight: 700; font-size: 16px; color: #f8fafc; }
-        .account-details .acc-phone { font-size: 13px; color: var(--subtext-color); margin-top: 2px; }
+        .account-details .acc-name { font-weight: 700; font-size: 15px; color: #f8fafc; }
+        .account-details .acc-phone { font-size: 12px; color: var(--subtext-color); margin-top: 2px; }
+        
+        .card-buttons { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
         .switch-btn {
-            background: transparent; color: var(--bb-green); border: 1px solid var(--bb-green);
-            padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;
+            background: #eab308; color: #000; border: none;
+            padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;
         }
         .account-option-card.active-switch .switch-btn { background: var(--bb-green); color: white; }
-        
+        .export-btn { background: #3b82f6; color: #fff; border: none; padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; }
+        .delete-btn { background: #ef4444; color: #fff; border: none; padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; }
+
         .action-box {
             background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; margin-bottom: 14px;
         }
@@ -109,10 +128,14 @@
         <a href="https://t.me/gbx_x_bb_bot" class="telegram-btn" target="_blank">Go to Telegram Bot</a>
     </div>
 
+    <div class="portal-header">
+        <h2>WELCOME TO GBX CAPITAL X BB</h2>
+    </div>
+
     <!-- TAB 1: MY ACCOUNTS & LOGIN OPTIONS -->
     <div id="page-accounts" class="tab-page active-page">
-        <div class="section-title">📱 My Connected Accounts</div>
-        <div id="selector-accounts-list">
+        <div class="section-title">📱 Saved Accounts</div>
+        <div class="accounts-scroll-box" id="selector-accounts-list">
             <div style="text-align: center; color: var(--subtext-color); padding: 20px 0;">Loading accounts...</div>
         </div>
 
@@ -204,9 +227,10 @@
                                         <div class="acc-phone">+91 ${acc.phone}</div>
                                     </div>
                                 </div>
-                                <div style="display:flex; gap:6px;">
+                                <div class="card-buttons">
                                     <button class="switch-btn" onclick="switchAccountSession('${acc.id}')">${isSelected ? 'Active ✓' : 'Switch'}</button>
-                                    <button class="switch-btn" style="border-color:#3b82f6; color:#3b82f6;" onclick="exportAuth('${acc.id}')">Export</button>
+                                    <button class="export-btn" onclick="exportAuth('${acc.id}')">Export</button>
+                                    <button class="delete-btn" onclick="deleteAccount('${acc.id}')">Delete</button>
                                 </div>
                             </div>`;
                     });
@@ -223,7 +247,7 @@
             let res = await fetch(`/api/set-active-session?user_id=${uid}&acc_id=${id}`);
             let data = await res.json();
             if(data.status === 'success') {
-                alert("✅ Account session switched successfully with new device spoofing!");
+                alert("✅ Account session switched successfully with device spoofing!");
                 loadSelectorAccounts();
             } else {
                 alert("❌ Failed to switch session.");
@@ -237,6 +261,20 @@
             if(data.json_data) {
                 navigator.clipboard.writeText(JSON.stringify(data.json_data, null, 2));
                 alert("📋 Auth JSON copied to clipboard!");
+            }
+        }
+
+        async function deleteAccount(id) {
+            if(confirm("Are you sure you want to delete this account from your saved list?")) {
+                const uid = getTelegramUserId();
+                let res = await fetch(`/api/delete-account?user_id=${uid}&acc_id=${id}`);
+                let data = await res.json();
+                if(data.status === 'success') {
+                    alert("🗑️ Account deleted successfully.");
+                    loadSelectorAccounts();
+                } else {
+                    alert("❌ Failed to delete account.");
+                }
             }
         }
 
@@ -272,11 +310,13 @@
             });
             let data = await res.json();
             if(data.success) {
-                alert("✅ Login successful and session saved with device spoofing!");
-                document.getElementById('otp-verify-section').style.display = 'none';
-                document.getElementById('otp-phone').value = '';
-                document.getElementById('otp-code').value = '';
-                loadSelectorAccounts();
+                if(confirm("Confirm you want to log in to this account?")) {
+                    alert("✅ Login successful and session saved securely!");
+                    document.getElementById('otp-verify-section').style.display = 'none';
+                    document.getElementById('otp-phone').value = '';
+                    document.getElementById('otp-code').value = '';
+                    loadSelectorAccounts();
+                }
             } else {
                 alert("❌ Verification failed.");
             }

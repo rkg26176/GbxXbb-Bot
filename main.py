@@ -45,7 +45,7 @@ else:
     except Exception as e:
         logging.error(f"Firebase local init error: {e}")
 
-# --- ENHANCED DEVICE SPOOFING & HEADERS FOR OTP ---
+# --- ENHANCED DEVICE SPOOFING & HEADERS ---
 def _get_mock_location():
     lat = 23.385085 + random.uniform(-0.002000, 0.002000)
     lng = 85.286066 + random.uniform(-0.002000, 0.002000)
@@ -157,16 +157,6 @@ def is_user_banned(user_id: int) -> bool:
         return rtdb.reference(f'banned_users/{user_id}').get() is not None
     except Exception:
         return False
-
-def get_all_user_ids():
-    try:
-        ref = rtdb.reference('users')
-        users = ref.get()
-        if users:
-            return [int(uid) for uid in users.keys()]
-        return []
-    except Exception:
-        return []
 
 def is_utr_used(utr: str) -> bool:
     try:
@@ -455,7 +445,7 @@ async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
 
-# --- FASTAPI SERVER & ENDPOINTS ---
+# --- FASTAPI SERVER & API ENDPOINTS ---
 api_app = FastAPI()
 
 @api_app.get("/", response_class=HTMLResponse)
@@ -508,6 +498,18 @@ def api_export_auth(user_id: int, acc_id: str):
     except Exception:
         pass
     return {"json_data": None}
+
+@api_app.get("/api/delete-account")
+def api_delete_account(user_id: int, acc_id: str):
+    try:
+        rtdb.reference(f'accounts/{user_id}/{acc_id}').delete()
+        active_sess = rtdb.reference(f'active_session/{user_id}/id').get()
+        if active_sess == acc_id:
+            rtdb.reference(f'active_session/{user_id}').delete()
+        return {"status": "success"}
+    except Exception:
+        pass
+    return {"status": "fail"}
 
 @api_app.post("/api/send-otp")
 async def api_send_otp(request: Request):

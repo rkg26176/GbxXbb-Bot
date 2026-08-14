@@ -30,16 +30,9 @@
         }
 
         #browser-lock-screen {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: #090d16;
-            z-index: 99999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            text-align: center;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #090d16; z-index: 99999; flex-direction: column;
+            align-items: center; justify-content: center; padding: 24px; text-align: center;
         }
         .telegram-btn {
             background: #0088cc; color: white; border: none; padding: 14px 28px;
@@ -51,17 +44,13 @@
             padding: 20px 16px 14px 16px;
             background: linear-gradient(180deg, #111827 0%, #090d16 100%);
             border-bottom: 1px solid var(--border-color);
-            text-align: center;
-            margin-bottom: 14px;
+            text-align: center; margin-bottom: 14px;
         }
         .portal-header h2 {
-            font-size: 18px;
-            font-weight: 900;
+            font-size: 18px; font-weight: 900;
             background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 1px;
-            text-transform: uppercase;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            letter-spacing: 1px; text-transform: uppercase;
         }
 
         .tab-page { display: none; padding: 16px; }
@@ -72,14 +61,9 @@
         .section-subtitle { font-size: 12px; color: var(--subtext-color); margin-top: 2px; }
 
         .accounts-scroll-box {
-            min-height: 200px;
-            max-height: 260px;
-            overflow-y: auto;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 14px;
-            margin-bottom: 16px;
+            min-height: 200px; max-height: 260px; overflow-y: auto;
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 16px; padding: 14px; margin-bottom: 16px;
         }
 
         .account-option-card {
@@ -101,13 +85,9 @@
         }
         .account-option-card.active-switch .switch-btn { background: var(--bb-green); color: white; }
 
-        .empty-accounts {
-            text-align: center; color: var(--subtext-color); font-size: 13px; padding: 30px 0; font-style: italic;
-        }
+        .empty-accounts { text-align: center; color: var(--subtext-color); font-size: 13px; padding: 30px 0; font-style: italic; }
 
-        .main-action-buttons {
-            display: flex; flex-direction: column; gap: 10px;
-        }
+        .main-action-buttons { display: flex; flex-direction: column; gap: 10px; }
         .primary-action-btn {
             width: 100%; background: #111827; color: var(--bb-green); border: 2px solid var(--bb-green); padding: 14px;
             border-radius: 14px; font-weight: 800; font-size: 14px; cursor: pointer; text-align: center;
@@ -115,33 +95,20 @@
         .primary-action-btn:hover { background: var(--bb-green); color: white; }
         .without-login-btn { background: #374151; color: #fff; border-color: #4b5563; }
 
-        /* Dashboard View (BigBasket Interface) */
-        #page-dashboard {
-            display: none; background: #ffffff; color: #1f2937; min-height: 100vh;
-        }
-        .bb-top-bar {
-            background: #10b981; color: white; padding: 12px 16px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
+        /* Dashboard View */
+        #page-dashboard { display: none; background: #ffffff; color: #1f2937; min-height: 100vh; }
+        .bb-top-bar { background: #10b981; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
         .bb-location { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .bb-profile-pill {
             background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px;
             font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
         }
         .bb-search-box { padding: 12px 16px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
-        .bb-search-input {
-            width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; font-size: 14px; outline: none;
-        }
-        .bb-nav-icons {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px; text-align: center; background: #fff; border-bottom: 8px solid #f3f4f6;
-        }
+        .bb-search-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; font-size: 14px; outline: none; }
+        .bb-nav-icons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px; text-align: center; background: #fff; border-bottom: 8px solid #f3f4f6; }
         .bb-icon-item { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; }
-        .bb-icon-circle {
-            width: 48px; height: 48px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;
-        }
-        .bb-menu-item {
-            padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 15px; color: #1f2937; cursor: pointer;
-        }
+        .bb-icon-circle { width: 48px; height: 48px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .bb-menu-item { padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 15px; color: #1f2937; cursor: pointer; }
 
         /* Modal Popups */
         .modal-overlay {
@@ -190,7 +157,7 @@
         <h2>GBX X BB PANEL</h2>
     </div>
 
-    <!-- TAB 1: MY ACCOUNTS & LOGIN LANDING -->
+    <!-- TAB 1: MY ACCOUNTS -->
     <div id="page-accounts" class="tab-page active-page">
         <div class="section-header-wrap">
             <div class="section-title">📱 Connected Accounts</div>
@@ -217,7 +184,7 @@
         </div>
     </div>
 
-    <!-- DASHBOARD VIEW (BigBasket Store Layout) -->
+    <!-- DASHBOARD VIEW -->
     <div id="page-dashboard">
         <div class="bb-top-bar">
             <div class="bb-location" id="user-location-text">📍 <span>Home - 834005</span></div>
@@ -227,22 +194,10 @@
             <input type="text" class="bb-search-input" placeholder="Search for 'rice', 'dal', 'oil'...">
         </div>
         <div class="bb-nav-icons">
-            <div class="bb-icon-item" onclick="alert('Orders view')">
-                <div class="bb-icon-circle">📦</div>
-                <span>Orders</span>
-            </div>
-            <div class="bb-icon-item" onclick="alert('BB Wallet view')">
-                <div class="bb-icon-circle">👛</div>
-                <span>BBWallet</span>
-            </div>
-            <div class="bb-icon-item" onclick="alert('Address view')">
-                <div class="bb-icon-circle">📍</div>
-                <span>Address</span>
-            </div>
-            <div class="bb-icon-item" onclick="openAccountSelectorModal()">
-                <div class="bb-icon-circle">⚙️</div>
-                <span>Accounts</span>
-            </div>
+            <div class="bb-icon-item" onclick="alert('Orders view')"><div class="bb-icon-circle">📦</div><span>Orders</span></div>
+            <div class="bb-icon-item" onclick="alert('BB Wallet view')"><div class="bb-icon-circle">👛</div><span>BBWallet</span></div>
+            <div class="bb-icon-item" onclick="alert('Address view')"><div class="bb-icon-circle">📍</div><span>Address</span></div>
+            <div class="bb-icon-item" onclick="openAccountSelectorModal()"><div class="bb-icon-circle">⚙️</div><span>Accounts</span></div>
         </div>
         <div class="bb-menu-list">
             <div class="bb-menu-item" onclick="alert('My orders')"><span>My orders</span> <span>›</span></div>
@@ -261,7 +216,7 @@
         </div>
     </div>
 
-    <!-- OTP Modal Popup -->
+    <!-- OTP Modal -->
     <div id="otp-modal" class="modal-overlay">
         <div class="modal-box">
             <h3 id="otp-modal-title">🔑 Login with OTP</h3>
@@ -282,11 +237,11 @@
         </div>
     </div>
 
-    <!-- JSON Modal Popup -->
+    <!-- JSON Modal -->
     <div id="json-modal" class="modal-overlay">
         <div class="modal-box">
             <h3>📁 Login with JSON Session</h3>
-            <textarea id="modal-json-input" class="input-field" rows="4" placeholder="Paste valid session JSON or token format here..."></textarea>
+            <textarea id="modal-json-input" class="input-field" rows="4" placeholder="Paste bbAuthToken JSON here..."></textarea>
             <div class="modal-btn-row">
                 <button class="modal-btn modal-btn-cancel" onclick="closeJsonModal()">Cancel</button>
                 <button class="modal-btn modal-btn-confirm" onclick="submitJsonSession()">Save Session</button>
@@ -296,12 +251,8 @@
 
     <!-- BOTTOM NAVIGATION -->
     <div class="bottom-nav">
-        <div class="nav-tab active" id="tab-accounts-btn" onclick="switchTab('accounts')">
-            <span>📱</span><span>My Accounts</span>
-        </div>
-        <div class="nav-tab" id="tab-wallet-btn" onclick="switchTab('wallet')">
-            <span>👛</span><span>Wallet</span>
-        </div>
+        <div class="nav-tab active" id="tab-accounts-btn" onclick="switchTab('accounts')"><span>📱</span><span>My Accounts</span></div>
+        <div class="nav-tab" id="tab-wallet-btn" onclick="switchTab('wallet')"><span>👛</span><span>Wallet</span></div>
     </div>
 
     <script>
@@ -431,7 +382,7 @@
             });
             let data = await res.json();
             if(data.success) {
-                alert("📨 OTP sent successfully via BigBasket API!");
+                alert("📨 OTP sent successfully!");
                 document.getElementById('otp-step-1').style.display = 'none';
                 document.getElementById('otp-step-2').style.display = 'block';
             } else {

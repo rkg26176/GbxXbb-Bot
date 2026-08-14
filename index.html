@@ -177,7 +177,12 @@
         async function loadSelectorAccounts() {
             const uid = getTelegramUserId();
             const container = document.getElementById('selector-accounts-list');
-            if (!uid) return;
+            if (!uid) {
+                container.innerHTML = `<div style="text-align:center; color:var(--subtext-color); padding:15px;">Telegram User ID not found.</div>`;
+                return;
+            }
+
+            container.innerHTML = `<div style="text-align: center; color: var(--subtext-color); padding: 20px 0;">Loading accounts...</div>`;
 
             try {
                 let res = await fetch(`/api/user-accounts?user_id=${uid}`);
@@ -209,6 +214,7 @@
                 }
             } catch (e) {
                 console.error(e);
+                container.innerHTML = `<div style="text-align:center; color:#ef4444; padding:15px;">Failed to load accounts.</div>`;
             }
         }
 

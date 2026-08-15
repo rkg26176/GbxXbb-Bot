@@ -3,463 +3,481 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBX BigBasket Portal</title>
+    <title>Bigbasket Order Bot</title>
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bb-green: #10b981;
-            --bg-color: #090d16;
-            --text-color: #f8fafc;
-            --card-bg: #111827;
-            --border-color: #1f2937;
-            --subtext-color: #9ca3af;
-        }
-
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+            font-family: sans-serif;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            padding-bottom: 70px;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            justify-content: space-between;
         }
 
-        #browser-lock-screen {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: #090d16; z-index: 99999; flex-direction: column;
-            align-items: center; justify-content: center; padding: 24px; text-align: center;
-        }
-        .telegram-btn {
-            background: #0088cc; color: white; border: none; padding: 14px 28px;
-            border-radius: 12px; font-weight: bold; font-size: 16px; text-decoration: none;
-            display: inline-block; margin-top: 15px;
-        }
-
-        .portal-header {
-            padding: 20px 16px 14px 16px;
-            background: linear-gradient(180deg, #111827 0%, #090d16 100%);
-            border-bottom: 1px solid var(--border-color);
-            text-align: center; margin-bottom: 14px;
-        }
-        .portal-header h2 {
-            font-size: 18px; font-weight: 900;
-            background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            letter-spacing: 1px; text-transform: uppercase;
+        /* Lock Screen for External Browsers */
+        #lockScreen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #121212;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            text-align: center;
+            padding: 20px;
         }
 
-        .tab-page { display: none; padding: 16px; }
-        .tab-page.active-page { display: block; }
-        
-        .section-header-wrap { margin-bottom: 10px; }
-        .section-title { font-size: 17px; font-weight: 800; color: #f8fafc; }
-        .section-subtitle { font-size: 12px; color: var(--subtext-color); margin-top: 2px; }
-
-        .accounts-scroll-box {
-            min-height: 200px; max-height: 260px; overflow-y: auto;
-            background: var(--card-bg); border: 1px solid var(--border-color);
-            border-radius: 16px; padding: 14px; margin-bottom: 16px;
+        .lock-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
         }
 
-        .account-option-card {
-            background: #1f2937; border: 1px solid var(--border-color); border-radius: 12px;
-            padding: 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
+        .lock-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
         }
-        .account-option-card.active-switch { border-color: var(--bb-green); background: #13221c; }
-        .account-info { display: flex; align-items: center; gap: 10px; }
-        .account-icon {
-            width: 38px; height: 38px; background: #111827; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--bb-green);
+
+        .lock-desc {
+            font-size: 14px;
+            color: #9ca3af;
+            margin-bottom: 25px;
+            max-width: 300px;
         }
-        .acc-name { font-weight: 700; font-size: 14px; color: #f8fafc; }
-        .acc-phone { font-size: 11px; color: var(--subtext-color); margin-top: 2px; }
-        
+
+        .bot-link-btn {
+            background-color: #3b82f6;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        /* Top Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background-color: #1a1a1a;
+            border-bottom: 1px solid #2c2c2c;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .close-btn {
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* Sub Header Options */
+        .sub-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background-color: #1a1a1a;
+            overflow-x: auto;
+            border-bottom: 1px solid #2c2c2c;
+        }
+
+        .account-avatar-small {
+            background-color: #84cc16;
+            color: #000;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .badge-price {
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .badge-bbnow {
+            background-color: #84cc16;
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .sched {
+            color: #9ca3af;
+            font-size: 13px;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .main-content.active-tab {
+            display: block;
+        }
+
+        .search-bar {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            padding: 12px 15px;
+            border-radius: 25px;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        /* Accounts View */
+        .accounts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .add-acc-btn {
+            background-color: transparent;
+            border: 1px solid #84cc16;
+            color: #84cc16;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .account-item-card {
+            background-color: #1a1a1a;
+            border: 1px solid #2c2c2c;
+            padding: 12px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .acc-info-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .switch-btn {
-            background: #eab308; color: #000; border: none;
-            padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;
+            background-color: #84cc16;
+            color: #000;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
         }
-        .account-option-card.active-switch .switch-btn { background: var(--bb-green); color: white; }
 
-        .empty-accounts { text-align: center; color: var(--subtext-color); font-size: 13px; padding: 30px 0; font-style: italic; }
-
-        .main-action-buttons { display: flex; flex-direction: column; gap: 10px; }
-        .primary-action-btn {
-            width: 100%; background: #111827; color: var(--bb-green); border: 2px solid var(--bb-green); padding: 14px;
-            border-radius: 14px; font-weight: 800; font-size: 14px; cursor: pointer; text-align: center;
-        }
-        .primary-action-btn:hover { background: var(--bb-green); color: white; }
-        .without-login-btn { background: #374151; color: #fff; border-color: #4b5563; }
-
-        /* Dashboard View */
-        #page-dashboard { display: none; background: #ffffff; color: #1f2937; min-height: 100vh; }
-        .bb-top-bar { background: #10b981; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
-        .bb-location { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .bb-profile-pill {
-            background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px;
-            font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
-        }
-        .bb-search-box { padding: 12px 16px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
-        .bb-search-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; font-size: 14px; outline: none; }
-        .bb-nav-icons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px; text-align: center; background: #fff; border-bottom: 8px solid #f3f4f6; }
-        .bb-icon-item { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; }
-        .bb-icon-circle { width: 48px; height: 48px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .bb-menu-item { padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 15px; color: #1f2937; cursor: pointer; }
-
-        /* Modal Popups */
-        .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; padding: 20px;
-        }
-        .modal-box {
-            background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px;
-            width: 100%; max-width: 380px; padding: 20px; color: #f8fafc; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        }
-        .modal-box h3 { font-size: 16px; margin-bottom: 12px; color: #f8fafc; font-weight: 700; }
-        .input-field {
-            width: 100%; background: #090d16; border: 1px solid var(--border-color); color: #f8fafc;
-            padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; outline: none;
-        }
-        .modal-btn-row { display: flex; gap: 8px; }
-        .modal-btn { flex: 1; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; }
-        .modal-btn-confirm { background: var(--bb-green); color: white; }
-        .modal-btn-cancel { background: #374151; color: #9ca3af; }
-
-        .wallet-card {
-            background: linear-gradient(135deg, #059669, #047857); color: white;
-            padding: 24px; border-radius: 16px; box-shadow: 0 8px 20px rgba(5, 150, 105, 0.3); margin-bottom: 20px;
-        }
-        .wallet-title { font-size: 13px; opacity: 0.9; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .wallet-bal { font-size: 36px; font-weight: 900; margin: 10px 0 16px 0; }
-
+        /* Bottom Navigation */
         .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0; background: #111827;
-            display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid var(--border-color); z-index: 200;
+            display: flex;
+            justify-content: space-around;
+            background-color: #161616;
+            padding: 10px 0;
+            border-top: 1px solid #2c2c2c;
         }
-        .nav-tab { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--subtext-color); cursor: pointer; font-weight: 600; }
-        .nav-tab.active { color: var(--bb-green); }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 11px;
+            color: #9ca3af;
+            text-decoration: none;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: #84cc16;
+        }
+
+        /* JSON Input Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-box {
+            background-color: #1a1a1a;
+            border: 1px solid #374151;
+            padding: 20px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .modal-box textarea {
+            background-color: #111827;
+            color: #fff;
+            border: 1px solid #374151;
+            padding: 10px;
+            border-radius: 8px;
+            height: 120px;
+            resize: none;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btns button {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-cancel { background-color: #374151; color: #fff; }
+        .btn-save { background-color: #84cc16; color: #000; }
     </style>
 </head>
 <body>
 
-    <div id="browser-lock-screen">
-        <div style="font-size: 50px; margin-bottom: 15px;">🔒</div>
-        <h2>Access Restricted</h2>
-        <p style="margin-top: 8px; color: #9ca3af; font-size: 14px;">This Mini App can only be opened inside the Telegram Bot.</p>
-        <a href="https://t.me/gbx_x_bb_bot" class="telegram-btn" target="_blank">Go to Telegram Bot</a>
+    <!-- Lock Screen (Shown if opened outside Telegram Bot) -->
+    <div id="lockScreen">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-title">Access Denied</div>
+        <div class="lock-desc">This application can only be opened inside the Telegram bot. Please open via official bot link below:</div>
+        <a href="https://t.me/gbx_x_bb_bot" class="bot-link-btn" target="_blank">@gbx_x_bb_bot</a>
     </div>
 
-    <div class="portal-header">
-        <h2>GBX X BB PANEL</h2>
-    </div>
-
-    <!-- TAB 1: MY ACCOUNTS -->
-    <div id="page-accounts" class="tab-page active-page">
-        <div class="section-header-wrap">
-            <div class="section-title">📱 Connected Accounts</div>
-            <div class="section-subtitle">Switch and select your account</div>
-        </div>
-
-        <div class="accounts-scroll-box" id="selector-accounts-list">
-            <div class="empty-accounts">Loading accounts...</div>
-        </div>
-
-        <div class="main-action-buttons">
-            <button class="primary-action-btn" onclick="openOtpModal()">🔑 Login with OTP</button>
-            <button class="primary-action-btn" onclick="openJsonModal()">📁 Login with JSON Session</button>
-            <button class="primary-action-btn without-login-btn" onclick="openDashboardView()">🚀 Open Without Login</button>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <span class="close-btn">&times;</span>
+            <span class="title">Bigbasket Order B...</span>
         </div>
     </div>
 
-    <!-- TAB 2: WALLET PAGE -->
-    <div id="page-wallet" class="tab-page">
-        <div class="wallet-card">
-            <div class="wallet-title">💳 GBX Bot Wallet Balance</div>
-            <div class="wallet-bal" id="bot-wallet-balance">₹0.00</div>
-            <button style="width: 100%; background: #ffffff; color: #064e3b; border: none; padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer;" onclick="triggerBotAddBalance()">➕ Add Money via Bot</button>
+    <!-- Sub Header -->
+    <div class="sub-header">
+        <div class="account-avatar-small" id="headerAvatar">R.</div>
+        <div class="badge-price" id="headerWallet">₹0</div>
+        <div class="badge-bbnow">BB Now</div>
+        <div class="sched">Sched</div>
+        <div style="font-size: 12px; color: #9ca3af; margin-left: 5px;" id="headerPhone">+91 9341272594</div>
+    </div>
+
+    <!-- Tab 1: Search -->
+    <div id="tab-search" class="main-content active-tab">
+        <div class="search-bar">🔍 Search milk, eggs, atta...</div>
+    </div>
+
+    <!-- Tab 2: Cart -->
+    <div id="tab-cart" class="main-content">
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Cart (0)</div>
+        <p style="color: #9ca3af; text-align: center; margin-top: 40px;">Your cart is empty.</p>
+    </div>
+
+    <!-- Tab 3: Address -->
+    <div id="tab-address" class="main-content">
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Delivery address</div>
+        <div id="addressContainer">
+            <p style="color: #9ca3af;">No active address found.</p>
         </div>
     </div>
 
-    <!-- DASHBOARD VIEW -->
-    <div id="page-dashboard">
-        <div class="bb-top-bar">
-            <div class="bb-location" id="user-location-text">📍 <span>Home - 834005</span></div>
-            <div class="bb-profile-pill" onclick="openAccountSelectorModal()">👤 <span id="header-profile-name">Account</span> ▼</div>
+    <!-- Tab 4: Accounts Management -->
+    <div id="tab-accounts" class="main-content" style="display:none;">
+        <div class="accounts-header">
+            <span style="font-size: 18px; font-weight: bold;">Accounts</span>
+            <button class="add-acc-btn" onclick="openJsonModal()">+ Add account</button>
         </div>
-        <div class="bb-search-box">
-            <input type="text" class="bb-search-input" placeholder="Search for 'rice', 'dal', 'oil'...">
-        </div>
-        <div class="bb-nav-icons">
-            <div class="bb-icon-item" onclick="alert('Orders view')"><div class="bb-icon-circle">📦</div><span>Orders</span></div>
-            <div class="bb-icon-item" onclick="alert('BB Wallet view')"><div class="bb-icon-circle">👛</div><span>BBWallet</span></div>
-            <div class="bb-icon-item" onclick="alert('Address view')"><div class="bb-icon-circle">📍</div><span>Address</span></div>
-            <div class="bb-icon-item" onclick="openAccountSelectorModal()"><div class="bb-icon-circle">⚙️</div><span>Accounts</span></div>
-        </div>
-        <div class="bb-menu-list">
-            <div class="bb-menu-item" onclick="alert('My orders')"><span>My orders</span> <span>›</span></div>
-            <div class="bb-menu-item" onclick="alert('View cart')"><span>View cart</span> <span>›</span></div>
-            <div class="bb-menu-item" onclick="alert('Search products')"><span>Search products</span> <span>›</span></div>
-            <div class="bb-menu-item" onclick="alert('Support & FAQs')"><span>Support & FAQs</span> <span>›</span></div>
+        <div class="search-bar" style="margin-bottom: 15px;">🔍 Search by number or ID</div>
+        <div id="accountsListContainer">
+            <p style="color: #9ca3af;">Loading accounts from bot...</p>
         </div>
     </div>
 
-    <!-- Account Selector Modal -->
-    <div id="accounts-modal" class="modal-overlay">
+    <!-- Tab 5: Orders -->
+    <div id="tab-orders" class="main-content">
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Orders</div>
+    </div>
+
+    <!-- Tab 6: Plugins -->
+    <div id="tab-plugins" class="main-content">
+        <div style="font-size: 18px; font-weight: bold;">Plugins</div>
+    </div>
+
+    <!-- JSON Input Modal -->
+    <div class="modal-overlay" id="jsonModal">
         <div class="modal-box">
-            <h3>Switch / Select Account</h3>
-            <div id="modal-accounts-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 12px;"></div>
-            <button class="modal-btn modal-btn-cancel" style="width: 100%;" onclick="closeAccountSelectorModal()">Close</button>
-        </div>
-    </div>
-
-    <!-- OTP Modal -->
-    <div id="otp-modal" class="modal-overlay">
-        <div class="modal-box">
-            <h3 id="otp-modal-title">🔑 Login with OTP</h3>
-            <div id="otp-step-1">
-                <input type="text" id="modal-phone" class="input-field" placeholder="Enter 10-digit mobile number">
-                <div class="modal-btn-row">
-                    <button class="modal-btn modal-btn-cancel" onclick="closeOtpModal()">Cancel</button>
-                    <button class="modal-btn modal-btn-confirm" onclick="sendOtpRequest()">Send OTP</button>
-                </div>
-            </div>
-            <div id="otp-step-2" style="display:none;">
-                <input type="text" id="modal-otp-code" class="input-field" placeholder="Enter 6-digit OTP">
-                <div class="modal-btn-row">
-                    <button class="modal-btn modal-btn-cancel" onclick="closeOtpModal()">Cancel</button>
-                    <button class="modal-btn modal-btn-confirm" onclick="verifyOtpAndSave()">Verify & Save</button>
-                </div>
+            <h3 style="font-size: 16px;">Add Account via JSON</h3>
+            <p style="font-size: 12px; color: #9ca3af;">Paste session/account JSON configuration below:</p>
+            <textarea id="jsonInputBox" placeholder='{ "name": "New User", "phone": "+91...", "wallet": "0" }'></textarea>
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="closeJsonModal()">Cancel</button>
+                <button class="btn-save" onclick="saveAccountJson()">Save & Login</button>
             </div>
         </div>
     </div>
 
-    <!-- JSON Modal -->
-    <div id="json-modal" class="modal-overlay">
-        <div class="modal-box">
-            <h3>📁 Login with JSON Session</h3>
-            <textarea id="modal-json-input" class="input-field" rows="4" placeholder="Paste bbAuthToken JSON here..."></textarea>
-            <div class="modal-btn-row">
-                <button class="modal-btn modal-btn-cancel" onclick="closeJsonModal()">Cancel</button>
-                <button class="modal-btn modal-btn-confirm" onclick="submitJsonSession()">Save Session</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- BOTTOM NAVIGATION -->
+    <!-- Bottom Navigation Bar -->
     <div class="bottom-nav">
-        <div class="nav-tab active" id="tab-accounts-btn" onclick="switchTab('accounts')"><span>📱</span><span>My Accounts</span></div>
-        <div class="nav-tab" id="tab-wallet-btn" onclick="switchTab('wallet')"><span>👛</span><span>Wallet</span></div>
+        <a class="nav-item active" onclick="switchTab(this, 'tab-search')">🔍<span>Search</span></a>
+        <a class="nav-item" onclick="switchTab(this, 'tab-cart')">🛒<span>Cart</span></a>
+        <a class="nav-item" onclick="switchTab(this, 'tab-address')">📍<span>Address</span></a>
+        <a class="nav-item" onclick="switchTab(this, 'tab-accounts')">👤<span>Accounts</span></a>
+        <a class="nav-item" onclick="switchTab(this, 'tab-orders')">📦<span>Orders</span></a>
+        <a class="nav-item" onclick="switchTab(this, 'tab-plugins')">🧩<span>Plugins</span></a>
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-
-        function checkTelegramEnvironment() {
-            if (!tg.initDataUnsafe || !tg.initDataUnsafe.user || !tg.initDataUnsafe.user.id) {
-                document.getElementById('browser-lock-screen').style.display = 'flex';
-            }
-        }
-
-        tg.ready();
-        tg.expand();
-
-        let userAccounts = [];
-        let globalPhoneForOtp = "";
-
-        function getTelegramUserId() {
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                return tg.initDataUnsafe.user.id;
-            }
-            return null;
-        }
-
-        async function loadSelectorAccounts() {
-            const uid = getTelegramUserId();
-            const container = document.getElementById('selector-accounts-list');
-            if (!uid) return;
-
-            container.innerHTML = `<div class="empty-accounts">Loading accounts...</div>`;
-
-            try {
-                let res = await fetch(`/api/user-accounts?user_id=${uid}`);
-                let data = await res.json();
-                userAccounts = data.accounts || [];
-
-                if (userAccounts.length === 0) {
-                    container.innerHTML = `<div class="empty-accounts">No accounts found.</div>`;
-                } else {
-                    let html = '';
-                    userAccounts.forEach((acc) => {
-                        let isSelected = acc.active;
-                        html += `
-                            <div class="account-option-card ${isSelected ? 'active-switch' : ''}">
-                                <div class="account-info">
-                                    <div class="account-icon">📱</div>
-                                    <div>
-                                        <div class="acc-name">${acc.name || 'BigBasket User'}</div>
-                                        <div class="acc-phone">+91 ${acc.phone}</div>
-                                    </div>
-                                </div>
-                                <button class="switch-btn" onclick="switchAndOpenDashboard('${acc.id}')">${isSelected ? 'Active ✓' : 'Switch'}</button>
-                            </div>`;
-                    });
-                    container.innerHTML = html;
-
-                    let activeAcc = userAccounts.find(a => a.active);
-                    if (activeAcc) {
-                        document.getElementById('header-profile-name').innerText = activeAcc.name.split(' ')[0];
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-                container.innerHTML = `<div class="empty-accounts" style="color:#ef4444;">Failed to load accounts.</div>`;
-            }
-        }
-
-        async function switchAndOpenDashboard(id) {
-            const uid = getTelegramUserId();
-            let res = await fetch(`/api/set-active-session?user_id=${uid}&acc_id=${id}`);
-            let data = await res.json();
-            if(data.status === 'success') {
-                closeAccountSelectorModal();
-                openDashboardView();
-                loadSelectorAccounts();
+        // Check if opened inside Telegram Bot WebApp
+        window.addEventListener('DOMContentLoaded', (event) => {
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                // Telegram ke andar open hai -> App load hone do
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
             } else {
-                alert("❌ Failed to switch session.");
+                // Bahar browser mein open hai -> Lock screen dikhao
+                // Testing ke liye agar local chala rahe hain aur bypass karna ho toh agali line comment kar sakte hain
+                document.getElementById('lockScreen').style.display = 'flex';
             }
-        }
-
-        function openDashboardView() {
-            document.getElementById('page-accounts').style.display = 'none';
-            document.getElementById('page-wallet').style.display = 'none';
-            document.querySelector('.bottom-nav').style.display = 'none';
-            document.getElementById('page-dashboard').style.display = 'block';
-        }
-
-        function openAccountSelectorModal() {
-            const modalList = document.getElementById('modal-accounts-list');
-            if (userAccounts.length === 0) {
-                modalList.innerHTML = `<div style="text-align:center; padding:15px; color:#9ca3af;">No accounts found.</div>`;
-            } else {
-                let html = '';
-                userAccounts.forEach(acc => {
-                    html += `
-                        <div class="account-option-card">
-                            <div>
-                                <div class="acc-name">${acc.name}</div>
-                                <div class="acc-phone">+91 ${acc.phone}</div>
-                            </div>
-                            <button class="switch-btn" onclick="switchAndOpenDashboard('${acc.id}')">Select</button>
-                        </div>`;
-                });
-                modalList.innerHTML = html;
-            }
-            document.getElementById('accounts-modal').style.display = 'flex';
-        }
-
-        function closeAccountSelectorModal() { document.getElementById('accounts-modal').style.display = 'none'; }
-
-        // Modals
-        function openOtpModal() { document.getElementById('otp-modal').style.display = 'flex'; document.getElementById('otp-step-1').style.display = 'block'; document.getElementById('otp-step-2').style.display = 'none'; }
-        function closeOtpModal() { document.getElementById('otp-modal').style.display = 'none'; }
-        function openJsonModal() { document.getElementById('json-modal').style.display = 'flex'; }
-        function closeJsonModal() { document.getElementById('json-modal').style.display = 'none'; }
-
-        async function sendOtpRequest() {
-            const phone = document.getElementById('modal-phone').value.trim();
-            const uid = getTelegramUserId();
-            if(!phone || phone.length !== 10) { alert("Enter valid 10-digit phone number"); return; }
-            
-            globalPhoneForOtp = phone;
-            let res = await fetch(`/api/send-otp`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user_id: uid, phone: phone})
-            });
-            let data = await res.json();
-            if(data.success) {
-                alert("📨 OTP sent successfully!");
-                document.getElementById('otp-step-1').style.display = 'none';
-                document.getElementById('otp-step-2').style.display = 'block';
-            } else {
-                alert("❌ Failed to send OTP: " + (data.message || 'Unknown error'));
-            }
-        }
-
-        async function verifyOtpAndSave() {
-            const otp = document.getElementById('modal-otp-code').value.trim();
-            const uid = getTelegramUserId();
-            if(!otp) { alert("Enter OTP"); return; }
-
-            let res = await fetch(`/api/verify-otp`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user_id: uid, phone: globalPhoneForOtp, otp: otp})
-            });
-            let data = await res.json();
-            if(data.success) {
-                alert("✅ Login successful!");
-                closeOtpModal();
-                loadSelectorAccounts();
-                openDashboardView();
-            } else {
-                alert("❌ Verification failed.");
-            }
-        }
-
-        async function submitJsonSession() {
-            const jsonText = document.getElementById('modal-json-input').value.trim();
-            const uid = getTelegramUserId();
-            try {
-                let parsed = JSON.parse(jsonText);
-                let res = await fetch(`/api/save-json`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: uid, json_data: parsed})
-                });
-                let data = await res.json();
-                if(data.success) {
-                    alert("✅ Session saved successfully!");
-                    closeJsonModal();
-                    loadSelectorAccounts();
-                    openDashboardView();
-                } else {
-                    alert("❌ Failed to save session.");
-                }
-            } catch(e) {
-                alert("❌ Invalid JSON format!");
-            }
-        }
-
-        async function fetchBotWalletBalance() {
-            const uid = getTelegramUserId();
-            if (!uid) return;
-            try {
-                let res = await fetch(`/api/user-balance?user_id=${uid}`);
-                let data = await res.json();
-                if (data) {
-                    document.getElementById('bot-wallet-balance').innerText = `₹${(data.balance || 0).toFixed(2)}`;
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active-page'));
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(`page-${tabName}`).classList.add('active-page');
-            document.getElementById(`tab-${tabName}-btn`).classList.add('active');
-            if (tabName === 'wallet') fetchBotWalletBalance();
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            checkTelegramEnvironment();
-            loadSelectorAccounts();
-            fetchBotWalletBalance();
         });
+
+        let accountsData = [
+            { id: 1, name: "sanu .", phone: "+91 7050583880", wallet: "0", active: false },
+            { id: 2, name: "rounak .", phone: "+91 9341272594", wallet: "0", active: true }
+        ];
+
+        function renderAccounts() {
+            let container = document.getElementById('accountsListContainer');
+            container.innerHTML = '';
+
+            accountsData.forEach(acc => {
+                let card = document.createElement('div');
+                card.className = 'account-item-card';
+                if(acc.active) card.style.borderColor = '#84cc16';
+
+                let initial = acc.name ? acc.name.charAt(0).toUpperCase() : 'U';
+
+                card.innerHTML = `
+                    <div class="acc-info-left">
+                        <div class="account-avatar-small">${initial}</div>
+                        <div>
+                            <p style="font-weight: bold;">${acc.name}</p>
+                            <p style="font-size: 12px; color: #9ca3af;">${acc.phone}</p>
+                        </div>
+                    </div>
+                    ${acc.active ? '<span style="color: #84cc16; font-weight: bold; font-size: 13px;">Active</span>' : `<button class="switch-btn" onclick="switchAccount(${acc.id})">Switch</button>`}
+                `;
+                container.appendChild(card);
+
+                if(acc.active) {
+                    document.getElementById('headerAvatar').innerText = initial;
+                    document.getElementById('headerPhone').innerText = acc.phone;
+                    document.getElementById('headerWallet').innerText = `₹${acc.wallet || '0'}`;
+                }
+            });
+        }
+
+        function switchTab(element, tabId) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.main-content').forEach(tab => tab.classList.remove('active-tab'));
+            
+            element.classList.add('active');
+            document.getElementById(tabId).classList.add('active-tab');
+        }
+
+        function openJsonModal() {
+            document.getElementById('jsonModal').style.display = 'flex';
+        }
+
+        function closeJsonModal() {
+            document.getElementById('jsonModal').style.display = 'none';
+            document.getElementById('jsonInputBox').value = '';
+        }
+
+        function saveAccountJson() {
+            let jsonText = document.getElementById('jsonInputBox').value;
+            try {
+                let newAccJson = JSON.parse(jsonText);
+                
+                if(!newAccJson.name || !newAccJson.phone) {
+                    alert("JSON must contain 'name' and 'phone' fields!");
+                    return;
+                }
+
+                accountsData.forEach(acc => acc.active = false);
+                accountsData.push({
+                    id: accountsData.length + 1,
+                    name: newAccJson.name,
+                    phone: newAccJson.phone,
+                    wallet: newAccJson.wallet || "0",
+                    active: true
+                });
+
+                renderAccounts();
+                closeJsonModal();
+                alert('Account added and logged in successfully!');
+            } catch (e) {
+                alert('Invalid JSON format!');
+            }
+        }
+
+        function switchAccount(id) {
+            accountsData.forEach(acc => {
+                acc.active = (acc.id === id);
+            });
+            renderAccounts();
+            alert('Account switched successfully!');
+        }
+
+        renderAccounts();
     </script>
 </body>
 </html>

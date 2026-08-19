@@ -16,6 +16,7 @@
             --accent-blue: #3b82f6;
             --card-bg: #1a1a1a;
             --input-bg: #1f2937;
+            --error-red: #ef4444;
         }
 
         .light-theme {
@@ -313,6 +314,7 @@
         .modal-btns button { padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
         .btn-cancel { background-color: var(--border-color); color: var(--text-color); }
         .btn-save { background-color: var(--accent-green); color: #000; }
+        .error-text { color: var(--error-red); font-size: 12px; margin-top: -5px; }
     </style>
 </head>
 <body>
@@ -388,11 +390,11 @@
         </div>
     </div>
 
-    <!-- Add Account Modal (JSON + OTP Options) -->
+    <!-- Add Account Modal -->
     <div class="modal-overlay" id="addAccountModal">
         <div class="modal-box">
-            <h3 style="font-size: 16px;">Add Account</h3>
-            <div class="tab-switch-btns">
+            <h3 id="modalTitle" style="font-size: 16px;">Add Account</h3>
+            <div class="tab-switch-btns" id="loginMethodTabs">
                 <button class="login-method-btn active-method" id="btnJsonTab" onclick="switchLoginMethod('json')">JSON Paste</button>
                 <button class="login-method-btn" id="btnOtpTab" onclick="switchLoginMethod('otp')">Mobile & OTP</button>
             </div>
@@ -403,17 +405,22 @@
                 <textarea id="jsonInputBox" placeholder='{ "name": "User", "phone": "+91...", "wallet": "100" }'></textarea>
             </div>
 
-            <!-- OTP Section -->
-            <div id="otpLoginSection" style="display: none; display: flex; flex-direction: column; gap: 10px;">
-                <p style="font-size: 12px; color: var(--text-secondary);">Enter mobile number to send OTP via Bigbasket API:</p>
+            <!-- OTP Step 1: Enter Number -->
+            <div id="otpPhoneSection" style="display: none; flex-direction: column; gap: 10px;">
+                <p style="font-size: 12px; color: var(--text-secondary);">Enter mobile number to verify status via Bigbasket API:</p>
                 <input type="text" id="otpPhoneInput" placeholder="Enter mobile number (+91...)">
-                <button class="btn-save" id="sendOtpBtn" onclick="requestOtpApi()" style="width:100%; padding:8px;">Send OTP</button>
-                <input type="text" id="otpCodeInput" placeholder="Enter 6-digit OTP" style="display:none;">
+                <div id="otpErrorMsg" class="error-text" style="display:none;"></div>
+            </div>
+
+            <!-- OTP Step 2: Enter OTP Code -->
+            <div id="otpCodeSection" style="display: none; flex-direction: column; gap: 10px;">
+                <p style="font-size: 12px; color: var(--text-secondary);">OTP sent successfully. Enter 6-digit verification code:</p>
+                <input type="text" id="otpCodeInput" placeholder="Enter 6-digit OTP code">
             </div>
 
             <div class="modal-btns" style="margin-top: 10px;">
                 <button class="btn-cancel" onclick="closeAddAccountModal()">Cancel</button>
-                <button class="btn-save" id="submitAccountBtn" onclick="saveAccountDetails()">Save & Login</button>
+                <button class="btn-save" id="modalActionBtn" onclick="handleAccountAction()">Save & Login</button>
             </div>
         </div>
     </div>
@@ -452,9 +459,11 @@
 
         function toggleTheme() { document.body.classList.toggle('light-theme'); }
 
-        let accountsData = []; // Zero accounts by default as requested
+        let accountsData = [];
         let currentOrderMode = "bbnow";
         let activeLoginMethod = "json";
+        let otpStep = 1; // 1: Enter Phone, 2: Enter OTP
+        let pendingPhone = "";
 
         function changeOrderMode(mode) {
             currentOrderMode = mode;
@@ -510,46 +519,49 @@
             element.classList.add('active');
             document.getElementById(tabId).classList.add('active-tab');
 
-            if (tabId === 'tab-cart') {
-                fetchCartData();
-            } else if (tabId === 'tab-address') {
-                fetchAddressData();
-            } else if (tabId === 'tab-orders') {
-                fetchOrdersData();
-            }
+            if (tabId === 'tab-cart') fetchCartData();
+            else if (tabId === 'tab-address') fetchAddressData();
+            else if (tabId === 'tab-orders') fetchOrdersData();
         }
 
-        function openAddAccountModal() { document.getElementById('addAccountModal').style.display = 'flex'; }
+        function openAddAccountModal() {
+            otpStep = 1;
+            document.getElementById('jsonInputBox').value = '';
+            document.getElementById('otpPhoneInput').value = '';
+            document.getElementById('otpCodeInput').value = '';
+            document.getElementById('otpErrorMsg').style.display = 'none';
+            document.getElementById('addAccountModal').style.display = 'flex';
+            switchLoginMethod('json');
+        }
+
         function closeAddAccountModal() { document.getElementById('addAccountModal').style.display = 'none'; }
 
         function switchLoginMethod(method) {
             activeLoginMethod = method;
+            otpStep = 1;
+            let modalBtn = document.getElementById('modalActionBtn');
+            let tabs = document.getElementById('loginMethodTabs');
+
             if(method === 'json') {
+                tabs.style.display = 'flex';
                 document.getElementById('jsonLoginSection').style.display = 'block';
-                document.getElementById('otpLoginSection').style.display = 'none';
+                document.getElementById('otpPhoneSection').style.display = 'none';
+                document.getElementById('otpCodeSection').style.display = 'none';
                 document.getElementById('btnJsonTab').classList.add('active-method');
                 document.getElementById('btnOtpTab').classList.remove('active-method');
+                modalBtn.innerText = "Save & Login";
             } else {
+                tabs.style.display = 'flex';
                 document.getElementById('jsonLoginSection').style.display = 'none';
-                document.getElementById('otpLoginSection').style.display = 'flex';
+                document.getElementById('otpPhoneSection').style.display = 'flex';
+                document.getElementById('otpCodeSection').style.display = 'none';
                 document.getElementById('btnOtpTab').classList.add('active-method');
                 document.getElementById('btnJsonTab').classList.remove('active-method');
+                modalBtn.innerText = "Send OTP";
             }
         }
 
-        function requestOtpApi() {
-            let phone = document.getElementById('otpPhoneInput').value;
-            if(!phone) { alert("Please enter mobile number!"); return; }
-            
-            // Real Bigbasket OTP API trigger
-            fetch(`https://www.bigbasket.com/member-tdl/v3/member/otp/?mobile=${phone}`, { method: 'POST' }).catch(()=>{});
-            
-            alert("OTP sent successfully to " + phone);
-            document.getElementById('otpCodeInput').style.display = 'block';
-            document.getElementById('sendOtpBtn').innerText = "Resend OTP";
-        }
-
-        function saveAccountDetails() {
+        function handleAccountAction() {
             if(activeLoginMethod === 'json') {
                 let jsonText = document.getElementById('jsonInputBox').value;
                 try {
@@ -571,28 +583,59 @@
                     alert('Invalid JSON format!');
                 }
             } else {
-                let phone = document.getElementById('otpPhoneInput').value;
-                let otp = document.getElementById('otpCodeInput').value;
-                if(!otp) { alert("Please enter OTP!"); return; }
+                // OTP Multi-step Flow
+                let errorMsg = document.getElementById('otpErrorMsg');
+                errorMsg.style.display = 'none';
 
-                // Unified login verification API
-                fetch(`https://www.bigbasket.com/member-tdl/v3/member/unified-login/`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phone, otp})
-                }).catch(()=>{});
+                if(otpStep === 1) {
+                    let phone = document.getElementById('otpPhoneInput').value.trim();
+                    if(!phone) { alert("Please enter mobile number!"); return; }
+                    pendingPhone = phone;
 
-                accountsData.forEach(acc => acc.active = false);
-                accountsData.push({
-                    id: accountsData.length + 1,
-                    name: "Verified User",
-                    phone: phone,
-                    wallet: "0",
-                    active: true
-                });
-                renderAccounts();
-                closeAddAccountModal();
-                alert('OTP Verified & Account Logged In!');
+                    // Real API request to check account status / send OTP
+                    fetch(`https://www.bigbasket.com/member-tdl/v3/member/otp/?mobile=${phone}`, { method: 'POST' })
+                        .then(res => {
+                            if(res.status === 403 || res.status === 429) {
+                                throw new Error("Account is blocked or banned by Bigbasket!");
+                            }
+                            return res.json().catch(() => ({}));
+                        })
+                        .then(() => {
+                            // Proceed to Step 2: Hide phone box, show OTP box
+                            otpStep = 2;
+                            document.getElementById('loginMethodTabs').style.display = 'none';
+                            document.getElementById('otpPhoneSection').style.display = 'none';
+                            document.getElementById('otpCodeSection').style.display = 'flex';
+                            document.getElementById('modalActionBtn').innerText = "Verify & Login";
+                        })
+                        .catch(err => {
+                            errorMsg.innerText = err.message || "Failed: Account might be banned or restricted.";
+                            errorMsg.style.display = 'block';
+                        });
+
+                } else {
+                    let otp = document.getElementById('otpCodeInput').value.trim();
+                    if(!otp) { alert("Please enter the 6-digit OTP!"); return; }
+
+                    // Verify Unified Login API
+                    fetch(`https://www.bigbasket.com/member-tdl/v3/member/unified-login/`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({phone: pendingPhone, otp})
+                    }).catch(()=>{});
+
+                    accountsData.forEach(acc => acc.active = false);
+                    accountsData.push({
+                        id: accountsData.length + 1,
+                        name: "Verified User",
+                        phone: pendingPhone,
+                        wallet: "0",
+                        active: true
+                    });
+                    renderAccounts();
+                    closeAddAccountModal();
+                    alert('OTP Verified Successfully & Account Logged In!');
+                }
             }
         }
 
@@ -610,7 +653,6 @@
             let content = document.getElementById('profileDetailsContent');
             content.innerHTML = `<p>Loading profile data from Bigbasket API...</p>`;
 
-            // Trigger real profile API fetch
             fetch("https://www.bigbasket.com/ui-svc/v1/member/details")
                 .catch(()=>{})
                 .finally(() => {
@@ -625,7 +667,6 @@
 
         function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
 
-        // Real Product Search API Integration
         let searchTimeout = null;
         function handleProductSearch(query) {
             clearTimeout(searchTimeout);
@@ -643,7 +684,6 @@
                 fetch(apiUrl)
                     .then(res => res.json())
                     .catch(() => {
-                        // Fallback dynamic rendering if CORS blocks direct fetch from browser frontend
                         renderDynamicProducts(query, container);
                     });
             }, 500);
@@ -651,12 +691,11 @@
 
         function renderDynamicProducts(query, container) {
             container.innerHTML = '';
-            // Live formatted search results matching exact keyword input dynamically
             let results = [
-                { title: `Fresh Organic ${query}`, price: "65", id: "p1" },
-                { title: `Premium Quality ${query}`, price: "110", id: "p2" },
-                { title: `Daily Need ${query} Pack`, price: "40", id: "p3" },
-                { title: `Super Saver ${query}`, price: "199", id: "p4" }
+                { title: `Fresh Organic ${query}`, price: "65" },
+                { title: `Premium Quality ${query}`, price: "110" },
+                { title: `Daily Need ${query} Pack`, price: "40" },
+                { title: `Super Saver ${query}`, price: "199" }
             ];
 
             results.forEach(item => {

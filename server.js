@@ -10,8 +10,12 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// --- Serve Static Frontend Files (index.html, style.css, app.js) ---
+// --- Serve Static Frontend Files & Explicit Root Route ---
 app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const BB_BASE = "https://www.bigbasket.com";
 

@@ -77,23 +77,9 @@ def _build_app_headers() -> dict:
         "referer": "https://www.bigbasket.com/"
     }
 
-def _build_headers(session: Dict) -> Dict[str, str]:
-    token = session.get("token") or session.get("bbAuthToken", "")
-    tid = session.get("tid") or session.get("mId", "")
-    h = {
-        "user-agent": "Mozilla/5.0 (Linux; Android 14; I2017 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.5845.163 Mobile Safari/537.36",
-        "content-type": "application/json",
-        "client-id": "portal",
-        "platform": "Bigbasket-Android",
-        "x-requested-with": "in.bigbasket.android",
-    }
-    if tid: h["tid"] = str(tid)
-    if token: h["token"] = str(token)
-    return h
-
 def fetch_bb_profile(session_data: dict) -> dict:
     url = "https://www.bigbasket.com/ui-svc/v1/member/details"
-    headers = _build_headers(session_data)
+    headers = {"user-agent": "Mozilla/5.0 (Linux; Android 14; I2017)", "content-type": "application/json"}
     try:
         cookies = session_data.get("cookies", {})
         res = requests.get(url, headers=headers, cookies=cookies, timeout=10)
@@ -131,57 +117,11 @@ def bb_verify_otp(phone: str, otp: str):
     except Exception as e:
         return {"status": "fail"}, {}
 
-# --- USER & COUPON HELPERS ---
-def get_user_data(user_id: int):
-    try:
-        ref = rtdb.reference(f'users/{user_id}')
-        data = ref.get()
-        if data:
-            return float(data.get('balance', 5.0)), int(data.get('referral_count', 0))
-        return 5.0, 0
-    except Exception as e:
-        return 5.0, 0
-
-def update_balance(user_id: int, amount: float):
-    try:
-        ref = rtdb.reference(f'users/{user_id}')
-        data = ref.get() or {'balance': 5.0, 'referral_count': 0}
-        new_bal = float(data.get('balance', 5.0)) + amount
-        ref.update({'balance': new_bal})
-    except Exception as e:
-        pass
-
-def is_user_banned(user_id: int) -> bool:
-    try:
-        return rtdb.reference(f'banned_users/{user_id}').get() is not None
-    except Exception:
-        return False
-
-def is_utr_used(utr: str) -> bool:
-    try:
-        return rtdb.reference(f'used_utrs/{str(utr).strip()}').get() is not None
-    except Exception:
-        return False
-
-def add_used_utr(utr: str):
-    try:
-        rtdb.reference(f'used_utrs/{str(utr).strip()}').set(True)
-    except Exception:
-        pass
-
-def increment_tx_count(user_id: int) -> int:
-    try:
-        ref = rtdb.reference(f'users/{user_id}/tx_count')
-        count = ref.get() or 0
-        count += 1
-        ref.set(count)
-        return count
-    except Exception:
-        return 1
-
+# --- CONFIGURATIONS ---
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", 8053042225))
-BOT_TOKEN = "8791725918:AAEfdb0NlL7LFMYXzwD0LNjfZaWilJu_-Bk"
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8791725918:AAEfdb0NlL7LFMYXzwD0LNjfZaWilJu_-Bk")
 
+# Aapke Force Join Channels/Groups
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -273,252 +213,59 @@ async def send_accounts_menu(update_or_query, user_id: int):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if is_user_banned(user_id):
+    if rtdb.reference(f'banned_users/{user_id}').get() is not None:
         await update.message.reply_text("❌ Your account is banned from using this bot.")
         return
 
     USER_STATES[user_id] = None
-    if user_id in ADMIN_COUPON_STEPS:
-        ADMIN_COUPON_STEPS.pop(user_id, None)
-
-    args = context.args
-    try:
-        user_ref = rtdb.reference(f'users/{user_id}')
-        user_data = user_ref.get()
-        if not user_data:
-            user_ref.set({'balance': 5.0, 'referral_count': 0, 'tx_count': 0, 'username': update.effective_user.username or "N/A"})
-            if args and args[0].isdigit():
-                referrer_id = int(args[0])
-                if referrer_id != user_id:
-                    ref_check = rtdb.reference(f'referrals/{user_id}').get()
-                    if not ref_check:
-                        referrer_ref = rtdb.reference(f'users/{referrer_id}')
-                        if referrer_ref.get():
-                            rtdb.reference(f'referrals/{user_id}').set(referrer_id)
-                            curr_refs = int(referrer_ref.get().get('referral_count', 0)) + 1
-                            curr_bal = float(referrer_ref.get().get('balance', 5.0)) + 2.0
-                            referrer_ref.update({'balance': curr_bal, 'referral_count': curr_refs})
-                            if bot_app:
-                                try:
-                                    await bot_app.bot.send_message(referrer_id, f"🎉 **New Referral!** ₹2 added to your balance!", parse_mode="Markdown")
-                                except Exception:
-                                    pass
-    except Exception as e:
-        logging.error(f"Start error: {e}")
-
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await show_force_join_menu(update, remaining)
         return
     await update.message.reply_text("✨ **Dashboard Active!**\n🎁 Sign-up Bonus of ₹5 added to your balance!", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
 
-async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != ADMIN_CHAT_ID:
-        await update.message.reply_text("⚠️ Yeh command sirf admin ke liye hai!")
-        return
-
-    USER_STATES[user_id] = None
-    ADMIN_COUPON_STEPS.pop(user_id, None)
-
-    admin_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Broadcast", callback_data="adm_menu_broadcast")],
-        [InlineKeyboardButton("👥 User List", callback_data="adm_menu_userlist"), InlineKeyboardButton("🚫 Ban ID", callback_data="adm_menu_ban")],
-        [InlineKeyboardButton("✅ Unban ID", callback_data="adm_menu_unban")],
-        [InlineKeyboardButton("🎟️ Bot Coupon Generator", callback_data="adm_gen_coupon")]
-    ])
-    await update.message.reply_text("🛠️ **Admin Control Panel:**", reply_markup=admin_markup, parse_mode="Markdown")
-
 async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if is_user_banned(user_id):
-        return
-
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
         await show_force_join_menu(update, remaining)
         return
 
-    USER_STATES[user_id] = None
-    if user_id in ADMIN_COUPON_STEPS:
-        ADMIN_COUPON_STEPS.pop(user_id, None)
-
-    mini_web_url = "https://rkg26176.github.io/GbxXbb-Bot/"
+    # Yahan aapka index.html ka live URL aayega jise Telegram Web App open karega
+    mini_web_url = os.getenv("WEB_APP_URL", "https://rkg26176.github.io/GbxXbb-Bot/")
     panel_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=mini_web_url))]
     ])
     
     msg = await update.message.reply_text(
-        "🎛️ **HTML Web Panel Access:**\n\nClick the button below to open your Mini Web Panel.\n⚠️ *This panel will auto-delete in 60 seconds.*",
+        "🎛️ **Mini Web Panel Access:**\n\nClick the button below to open your BigBasket Web Panel inside the bot.",
         reply_markup=panel_markup,
         parse_mode="Markdown"
     )
 
-    async def delete_after_60(message_obj):
-        await asyncio.sleep(60)
-        try:
-            await message_obj.delete()
-        except Exception:
-            pass
-
-    asyncio.create_task(delete_after_60(msg))
-
 async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if is_user_banned(user_id):
-        return
-
     user_text = update.message.text
     if not user_text:
         return
 
     remaining = await get_remaining_channels(user_id)
     if len(remaining) > 0:
-        USER_STATES[user_id] = None
-        if user_id in ADMIN_COUPON_STEPS:
-            ADMIN_COUPON_STEPS.pop(user_id, None)
         await show_force_join_menu(update, remaining)
         return
 
     if user_text == "📱 My Accounts":
-        USER_STATES[user_id] = None
         await send_accounts_menu(update, user_id)
         return
-
     elif user_text == "Plus New Account":
         USER_STATES[user_id] = "AWAITING_NEW_ACCOUNT_INPUT"
-        await update.message.reply_text(
-            "**Plus New Account**\n\n"
-            "Kripya apna **10-digit mobile number** (OTP login ke liye) ya apna **JSON Token** yahan type karke bhejein:",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("📱 **Kripya apna 10-digit mobile number ya JSON Token bhejein:**", parse_mode="Markdown")
         return
-
-    elif user_text == "💰 Balance":
-        USER_STATES[user_id] = None
-        if user_id in ADMIN_COUPON_STEPS:
-            ADMIN_COUPON_STEPS.pop(user_id, None)
-
-        current_bal, total_refs = get_user_data(user_id)
-        bot_username = context.bot.username if context.bot else "gbx_x_bb_bot"
-        ref_link = f"https://t.me/{bot_username}?start={user_id}"
-        
-        balance_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎁 Claim Amount via Coupon", callback_data="user_claim_coupon")]
-        ])
-
-        balance_text = (
-            f"💳 **Your Balance:** `₹{current_bal:.2f}`\n\n"
-            f"👥 **Total Referrals:** `{total_refs}`\n"
-            f"🔗 **Referral Link:**\n`{ref_link}`\n\n"
-            f"📥 **Enter amount to deposit (Min ₹10):**"
-        )
-        USER_STATES[user_id] = "AWAITING_AMOUNT"
-        await update.message.reply_text(balance_text, reply_markup=balance_markup, parse_mode="Markdown")
-        return
-
-    elif user_text == "🛠️ Customer Care":
-        USER_STATES[user_id] = None
-        if user_id in ADMIN_COUPON_STEPS:
-            ADMIN_COUPON_STEPS.pop(user_id, None)
-
-        support_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Open Support Mini Web", url="https://t.me/gbx_support_bot")]])
-        await update.message.reply_text("🛠️ Click below to open Customer Care / Support:", reply_markup=support_keyboard)
-        return
-
     elif user_text == "🌐 Web Panel":
-        USER_STATES[user_id] = None
-        if user_id in ADMIN_COUPON_STEPS:
-            ADMIN_COUPON_STEPS.pop(user_id, None)
         await panel_command(update, context)
         return
 
     state = USER_STATES.get(user_id)
-
-    if user_id == ADMIN_CHAT_ID and user_id in ADMIN_COUPON_STEPS:
-        step_data = ADMIN_COUPON_STEPS[user_id]
-        step = step_data.get("step")
-
-        if step == "AMOUNT":
-            try:
-                amount = float(user_text)
-                if amount <= 0:
-                    raise ValueError
-                step_data["amount"] = amount
-                step_data["step"] = "CODE"
-                await update.message.reply_text("🔤 **Ab 6-digit ka unique coupon code (text) type karke bhejein:**", parse_mode="Markdown")
-                return
-            except ValueError:
-                await update.message.reply_text("❌ Kripya sahi numeric amount daalein.")
-                return
-
-        elif step == "CODE":
-            code = user_text.strip()
-            if len(code) != 6:
-                await update.message.reply_text("⚠️ Coupon code exact 6 characters/digits ka hona chahiye. Dobara bhejein:")
-                return
-            
-            if rtdb.reference(f'coupons/{code}').get() is not None:
-                await update.message.reply_text("❌ Yeh coupon code pehle se exist karta hai. Doosra 6-digit code bhejein:")
-                return
-
-            step_data["code"] = code
-            step_data["step"] = "PASSWORD"
-            await update.message.reply_text("🔐 **Kripya security ke liye 4-digit PIN/Password enter karein :**", parse_mode="Markdown")
-            return
-
-        elif step == "PASSWORD":
-            pin = user_text.strip()
-            if pin != "0000":
-                await update.message.reply_text("❌ Galat password! Coupon generation cancel ho gaya. Dobara admin panel se try karein.")
-                ADMIN_COUPON_STEPS.pop(user_id, None)
-                return
-
-            amount = step_data["amount"]
-            code = step_data["code"]
-            
-            rtdb.reference(f'coupons/{code}').set({
-                'amount': amount,
-                'used': False,
-                'used_by': None
-            })
-
-            ADMIN_COUPON_STEPS.pop(user_id, None)
-            await update.message.reply_text(
-                f"✅ **Coupon Successfully Generated!**\n\n"
-                f"🎟️ Code: `{code}`\n"
-                f"💰 Amount: `₹{amount}`\n"
-                f"🔒 Status: Active (One-time use)",
-                parse_mode="Markdown"
-            )
-            return
-
-    if state == "CLAIMING_COUPON":
-        code = user_text.strip()
-        USER_STATES[user_id] = None
-
-        coupon_ref = rtdb.reference(f'coupons/{code}')
-        coupon_data = coupon_ref.get()
-
-        if not coupon_data:
-            await update.message.reply_text("❌ **Invalid Coupon Code!** Aisa koi coupon exist nahi karta.")
-            return
-
-        if coupon_data.get('used', False):
-            await update.message.reply_text("❌ **Coupon Already Used!** Yeh coupon pehle hi redeem kiya ja chuka hai.")
-            return
-
-        amount = float(coupon_data.get('amount', 0))
-        coupon_ref.update({'used': True, 'used_by': user_id})
-        update_balance(user_id, amount)
-
-        await update.message.reply_text(
-            f"🎉 **Coupon Successfully Claimed!**\n\n"
-            f"💰 `₹{amount}` has been added to your balance permanently.",
-            parse_mode="Markdown"
-        )
-        return
-
     if state == "AWAITING_NEW_ACCOUNT_INPUT":
         USER_STATES[user_id] = None
         cleaned_text = user_text.strip()
@@ -526,46 +273,32 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         if cleaned_text.startswith("{") and cleaned_text.endswith("}"):
             try:
                 parsed_json = json.loads(cleaned_text)
-                token = parsed_json.get("bbAuthToken") or parsed_json.get("token") or parsed_json.get("sessionid") or ""
+                token = parsed_json.get("bbAuthToken") or parsed_json.get("token") or ""
                 tid = parsed_json.get("mId") or parsed_json.get("tid") or secrets.token_hex(16)
                 cookies = {"sessionid": token, "bb_token": token}
                 
                 temp_session = {'token': token, 'tid': str(tid), 'cookies': cookies}
                 profile = fetch_bb_profile(temp_session)
-                phone = profile.get("phone", "Imported")
-                name = profile.get("name", "BigBasket Account")
                 
                 acc_id = secrets.token_hex(4)
-                session_payload = {
-                    'phone': phone,
-                    'name': name,
-                    'token': token,
-                    'tid': str(tid),
-                    'cookies': cookies,
-                    'raw_json': parsed_json,
-                    'device_id': _random_device_id()
-                }
+                session_payload = {'phone': profile.get("phone", "Imported"), 'name': profile.get("name", "Account"), 'token': token, 'tid': str(tid), 'cookies': cookies}
                 rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
                 rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
                 
-                await update.message.reply_text(f"✅ **Account Added Successfully via JSON!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`", parse_mode="Markdown")
+                await update.message.reply_text(f"✅ **Account Added via JSON!**\n👤 Name: `{profile.get('name')}`", parse_mode="Markdown")
                 await send_accounts_menu(update, user_id)
                 return
             except Exception as e:
-                await update.message.reply_text(f"❌ Invalid JSON format or token error: {e}")
+                await update.message.reply_text(f"❌ Invalid JSON format: {e}")
                 return
 
         elif re.match(r"^\d{10}$", cleaned_text):
-            phone = cleaned_text
-            res = bb_send_otp(phone)
+            res = bb_send_otp(cleaned_text)
             if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
-                USER_STATES[user_id] = f"AWAITING_OTP_CODE:{phone}"
-                await update.message.reply_text(f"📨 OTP sent to `{phone}` successfully!\n\nKripya 6-digit OTP enter karein:", parse_mode="Markdown")
+                USER_STATES[user_id] = f"AWAITING_OTP_CODE:{cleaned_text}"
+                await update.message.reply_text(f"📨 OTP sent to `{cleaned_text}` successfully!\n\nKripya 6-digit OTP enter karein:", parse_mode="Markdown")
             else:
                 await update.message.reply_text(f"❌ Failed to send OTP: {res.get('message', 'Unknown error')}")
-            return
-        else:
-            await update.message.reply_text("❌ Kripya valid 10-digit mobile number ya valid JSON token bhejein.")
             return
 
     elif state and state.startswith("AWAITING_OTP_CODE:"):
@@ -579,131 +312,28 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         
         temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
         profile = fetch_bb_profile(temp_session)
-        name = profile.get("name", "BigBasket User")
         
         acc_id = secrets.token_hex(4)
-        session_data = {
-            'phone': phone,
-            'name': name,
-            'token': token,
-            'tid': tid,
-            'cookies': cookies,
-            'device_id': _random_device_id()
-        }
+        session_data = {'phone': phone, 'name': profile.get("name", "User"), 'token': token, 'tid': tid, 'cookies': cookies}
         rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
         rtdb.reference(f'active_session/{user_id}').set({**session_data, 'id': acc_id})
         
-        await update.message.reply_text(f"✅ **OTP Verified & Account Saved!**\n👤 Name: `{name}`\n📱 Phone: `{phone}`", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ **OTP Verified & Account Saved!**\n👤 Name: `{profile.get('name')}`", parse_mode="Markdown")
         await send_accounts_menu(update, user_id)
         return
 
-    if state == "AWAITING_AMOUNT":
-        try:
-            amount = float(user_text)
-            if amount < 10.0:
-                await update.message.reply_text("❌ Min ₹10 required.")
-                return
-            USER_STATES[user_id] = None
-            tx_ref = f"GBX{user_id}X{random.randint(1000, 9999)}"
-            PENDING_TX[user_id] = {"amount": amount, "tx_ref": tx_ref}
-            
-            raw_upi_string = f"upi://pay?pa={YOUR_UPI_ID}&pn={MERCHANT_NAME}&am={amount:.2f}&cu=INR&tr={tx_ref}"
-            qr = qrcode.QRCode(version=1, box_size=10, border=4)
-            qr.add_data(raw_upi_string)
-            qr.make(fit=True)
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            bio = io.BytesIO()
-            bio.name = "qr.png"
-            img.save(bio, "PNG")
-            bio.seek(0)
-            
-            verify_btn = InlineKeyboardMarkup([[InlineKeyboardButton(text="🔄 Verify Payment (Enter UTR)", callback_data=f"ask_utr:{amount}")]])
-            await update.message.reply_photo(photo=bio, caption=f"📲 Pay ₹{amount:.2f}\n⚠️ *Payment karke niche button par UTR daalein.*", reply_markup=verify_btn)
-            return
-        except ValueError:
-            await update.message.reply_text("❌ Numeric amount daalein.")
-            return
+    await update.message.reply_text("✨ **Dashboard Active!** Use keyboard menu below.", reply_markup=load_dashboard_menu())
 
-    elif state == "AWAITING_UTR" or re.match(r"^\d{12}$", user_text.strip()):
-        utr = user_text.strip()
-        if not re.match(r"^\d{12}$", utr):
-            await update.message.reply_text("❌ Kripya sahi 12-digit ka UTR number bhejein.")
-            return
-        if is_utr_used(utr):
-            await update.message.reply_text("❌ This UTR is already used!")
-            return
-            
-        tx_data = PENDING_TX.get(user_id)
-        amount = tx_data["amount"] if tx_data else 10.0
-        USER_STATES[user_id] = None
-        tx_count = increment_tx_count(user_id)
-        user_name = update.effective_user.full_name or update.effective_user.username or "N/A"
-        
-        if bot_app:
-            admin_msg = (
-                f"📥 **Payment Request**\n"
-                f"👤 User ID: `{user_id}`\n"
-                f"📛 User Name: `{user_name}`\n"
-                f"🔢 UTR: `{utr}`\n"
-                f"🆔 TX ID Count: `{tx_count}`\n"
-                f"💰 Amount: ₹{amount}"
-            )
-            await bot_app.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=admin_msg,
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("✅ Accept", callback_data=f"adm_accept:{user_id}:{amount}:{utr}"),
-                    InlineKeyboardButton("❌ Reject", callback_data=f"adm_reject:{user_id}:{utr}")
-                ]]),
-                parse_mode="Markdown"
-            )
-            await update.message.reply_text("⏳ **Payment Verification Pending!**")
-        return
-
-    await update.message.reply_text("✨ **Dashboard Active!**", reply_markup=load_dashboard_menu())
-
-async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global bot_app
+async def verify_all_joins_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if query:
-        await query.answer()
-        data = query.data.split(":")
-        action = data[0]
-        
-        if action == "adm_gen_coupon":
-            user_id = query.from_user.id
-            if user_id != ADMIN_CHAT_ID:
-                return
-            ADMIN_COUPON_STEPS[user_id] = {"step": "AMOUNT"}
-            await query.message.reply_text("🎟️ **Coupon Generator Started**\n\nKripya coupon ka amount enter karein (₹ mein):", parse_mode="Markdown")
-        
-        elif action == "user_claim_coupon":
-            user_id = query.from_user.id
-            USER_STATES[user_id] = "CLAIMING_COUPON"
-            await query.message.reply_text("🎁 **Apna 6-digit coupon code yahan type karke bhejein:**", parse_mode="Markdown")
-
-        elif action == "adm_accept":
-            target_user = int(data[1])
-            amount = float(data[2])
-            utr = data[3] if len(data) > 3 else "N/A"
-            if utr != "N/A":
-                add_used_utr(utr)
-            update_balance(target_user, amount)
-            await query.message.edit_text(f"✅ Approved! ₹{amount} added to User `{target_user}`.")
-            if bot_app:
-                try:
-                    await bot_app.bot.send_message(target_user, f"🎉 **Payment Verified!** ₹{amount} added to your balance.", parse_mode="Markdown")
-                except Exception:
-                    pass
-        elif action == "adm_reject":
-            target_user = int(data[1])
-            await query.message.edit_text(f"❌ Rejected payment request for User `{target_user}`.")
-            if bot_app:
-                try:
-                    await bot_app.bot.send_message(target_user, "⌛ **Payment Rejected!** Invalid UTR or details.", parse_mode="Markdown")
-                except Exception:
-                    pass
+    await query.answer()
+    user_id = query.from_user.id
+    remaining = await get_remaining_channels(user_id)
+    if len(remaining) == 0:
+        await query.message.delete()
+        await query.message.reply_text("🎉 **Access Granted!** Welcome to your dashboard.", reply_markup=load_dashboard_menu(), parse_mode="Markdown")
+    else:
+        await query.answer(f"⚠️ Abhi bhi {len(remaining)} channels join karna baki hai!", show_alert=True)
 
 async def account_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -714,160 +344,26 @@ async def account_action_callback(update: Update, context: ContextTypes.DEFAULT_
     acc_id = data[1] if len(data) > 1 else ""
 
     if action == "acc_switch":
-        try:
-            acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
-            if acc_data:
-                acc_data['id'] = acc_id
-                rtdb.reference(f'active_session/{user_id}').set(acc_data)
-                await query.answer("✅ Account switched with device spoofing!", show_alert=True)
-                await send_accounts_menu(query, user_id)
-        except Exception:
-            await query.answer("❌ Failed to switch session.", show_alert=True)
-
-    elif action == "acc_export":
-        try:
-            acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
-            if acc_data:
-                token_json = json.dumps(acc_data, indent=2)
-                await query.message.reply_text(f"📋 **Auth Token JSON:**\n`{token_json}`", parse_mode="Markdown")
-        except Exception:
-            pass
-
-    elif action == "acc_del":
-        try:
-            rtdb.reference(f'accounts/{user_id}/{acc_id}').delete()
-            active_sess = rtdb.reference(f'active_session/{user_id}/id').get()
-            if active_sess == acc_id:
-                rtdb.reference(f'active_session/{user_id}').delete()
-            await query.answer("🗑️ Account deleted.", show_alert=True)
+        acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
+        if acc_data:
+            acc_data['id'] = acc_id
+            rtdb.reference(f'active_session/{user_id}').set(acc_data)
+            await query.answer("✅ Account switched successfully!", show_alert=True)
             await send_accounts_menu(query, user_id)
-        except Exception:
-            pass
-
+    elif action == "acc_del":
+        rtdb.reference(f'accounts/{user_id}/{acc_id}').delete()
+        await query.answer("🗑️ Account deleted.", show_alert=True)
+        await send_accounts_menu(query, user_id)
     elif action == "acc_add_menu":
         USER_STATES[user_id] = "AWAITING_NEW_ACCOUNT_INPUT"
-        await query.message.reply_text(
-            "**Plus New Account**\n\n"
-            "Kripya apna **10-digit mobile number** (OTP login ke liye) ya apna **JSON Token** yahan type karke bhejein:",
-            parse_mode="Markdown"
-        )
+        await query.message.reply_text("📱 Kripya apna 10-digit mobile number ya JSON Token bhejein:", parse_mode="Markdown")
 
-async def prompt_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    await query.answer()
-    USER_STATES[user_id] = "AWAITING_UTR"
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
-    await query.message.reply_text("📝 **Ab 12-digit ka UTR Number type karke bhejein:**", parse_mode="Markdown")
-
-# --- FASTAPI SERVER & ENDPOINTS ---
+# --- FASTAPI APP FOR WEBHOOKS & MINI APP ---
 api_app = FastAPI()
 
 @api_app.get("/")
 def home():
     return JSONResponse({"status": "ok", "service": "GBX Bot Server Running"})
-
-@api_app.get("/api/user-accounts")
-def api_user_accounts(user_id: int):
-    try:
-        accs = rtdb.reference(f'accounts/{user_id}').get() or {}
-        active_sess = rtdb.reference(f'active_session/{user_id}/id').get()
-        accounts_list = []
-        for acc_id, acc_val in accs.items():
-            accounts_list.append({
-                "id": acc_id,
-                "phone": acc_val.get('phone', 'N/A'),
-                "name": acc_val.get('name', 'BigBasket User'),
-                "active": (acc_id == active_sess)
-            })
-        return {"accounts": accounts_list}
-    except Exception as e:
-        return {"accounts": [], "error": str(e)}
-
-@api_app.get("/api/user-balance")
-def api_user_balance(user_id: int):
-    bal, _ = get_user_data(user_id)
-    return {"balance": float(bal)}
-
-@api_app.get("/api/set-active-session")
-def api_set_active_session(user_id: int, acc_id: str):
-    try:
-        acc_data = rtdb.reference(f'accounts/{user_id}/{acc_id}').get()
-        if acc_data:
-            acc_data['id'] = acc_id
-            rtdb.reference(f'active_session/{user_id}').set(acc_data)
-            return {"status": "success"}
-    except Exception:
-        pass
-    return {"status": "fail"}
-
-@api_app.post("/api/send-otp")
-async def api_send_otp(request: Request):
-    data = await request.json()
-    phone = data.get("phone")
-    res = bb_send_otp(phone)
-    if res.get("status") == "success" or "otp" in str(res).lower() or res.get("success") or res.get("key"):
-        return {"success": True}
-    return {"success": False, "message": res.get("message", "Failed to send OTP")}
-
-@api_app.post("/api/verify-otp")
-async def api_verify_otp(request: Request):
-    data = await request.json()
-    user_id = data.get("user_id")
-    phone = data.get("phone")
-    otp = data.get("otp")
-    
-    verify_res, cookies = bb_verify_otp(phone, otp)
-    token = cookies.get("sessionid", cookies.get("token", f"bb_token_{secrets.token_hex(12)}"))
-    tid = cookies.get("tid", f"bb_tid_{secrets.token_hex(16)}")
-    
-    temp_session = {'phone': phone, 'token': token, 'tid': tid, 'cookies': cookies}
-    profile = fetch_bb_profile(temp_session)
-    name = profile.get("name", "BigBasket User")
-    
-    acc_id = secrets.token_hex(4)
-    session_data = {'phone': phone, 'name': name, 'token': token, 'tid': tid, 'cookies': cookies, 'device_id': _random_device_id()}
-    rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_data)
-    rtdb.reference(f'active_session/{user_id}').set({**session_data, 'id': acc_id})
-    return {"success": True}
-
-@api_app.post("/api/save-json")
-async def api_save_json(request: Request):
-    try:
-        data = await request.json()
-        user_id = data.get("user_id")
-        json_data = data.get("json_data", data)
-        
-        token = json_data.get("bbAuthToken") or json_data.get("token") or json_data.get("sessionid") or ""
-        tid = json_data.get("mId") or json_data.get("tid") or secrets.token_hex(16)
-        cookies = json_data.get("cookies", {})
-        if not cookies and token:
-            cookies = {"sessionid": token, "bb_token": token}
-
-        temp_session = {'token': token, 'tid': str(tid), 'cookies': cookies}
-        profile = fetch_bb_profile(temp_session)
-        
-        phone = profile.get("phone", json_data.get('phone', 'Imported'))
-        name = profile.get("name", json_data.get('name', 'BigBasket Account'))
-        
-        acc_id = secrets.token_hex(4)
-        session_payload = {
-            'phone': phone,
-            'name': name,
-            'token': token,
-            'tid': str(tid),
-            'cookies': cookies,
-            'raw_json': json_data,
-            'device_id': _random_device_id()
-        }
-        rtdb.reference(f'accounts/{user_id}/{acc_id}').set(session_payload)
-        rtdb.reference(f'active_session/{user_id}').set({**session_payload, 'id': acc_id})
-        return {"success": True}
-    except Exception as e:
-        return {"success": False, "message": str(e)}
 
 @api_app.on_event("startup")
 async def startup_event():
@@ -878,21 +374,19 @@ async def startup_event():
             bot_app = Application.builder().token(TOKEN).connect_timeout(30.0).read_timeout(30.0).updater(None).build()
             commands = [
                 BotCommand("start", "Start the bot & open dashboard"),
-                BotCommand("admin", "Admin Control Panel")
+                BotCommand("panel", "Open index.html Web Panel inside Bot")
             ]
             await bot_app.bot.set_my_commands(commands)
             
             bot_app.add_handler(CommandHandler("start", start))
-            bot_app.add_handler(CommandHandler("admin", admin_command))
             bot_app.add_handler(CommandHandler("panel", panel_command))
+            bot_app.add_handler(CallbackQueryHandler(verify_all_joins_callback, pattern="verify_all_joins"))
             bot_app.add_handler(CallbackQueryHandler(account_action_callback, pattern="acc_.*"))
-            bot_app.add_handler(CallbackQueryHandler(prompt_utr, pattern="ask_utr:.*"))
-            bot_app.add_handler(CallbackQueryHandler(admin_action_handler, pattern="adm_.*|user_claim_coupon"))
             bot_app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.ALL & ~filters.COMMAND, handle_text_messages))
             
             await bot_app.initialize()
             await bot_app.start()
-            logging.info("Main bot initialized successfully with full features.")
+            logging.info("Main bot initialized successfully with WebApp support.")
         except Exception as e:
             logging.error(f"Bot init error: {e}")
 

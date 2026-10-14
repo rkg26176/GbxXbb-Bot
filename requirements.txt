@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-python-telegram-bot
-psycopg2-binary
-requests
-qrcode
-pillow
-urllib3
-firebase-admin

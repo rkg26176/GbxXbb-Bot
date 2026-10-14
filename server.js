@@ -3,15 +3,19 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// --- Serve Static Frontend Files (index.html, style.css, app.js) ---
+app.use(express.static(path.join(__dirname)));
+
 const BB_BASE = "https://www.bigbasket.com";
 
-// --- AES-GCM Decryption & Encryption (Matching frontend app.js) ---[span_2](start_span)[span_2](end_span)
+// --- AES-GCM Decryption & Encryption (Matching frontend app.js) ---
 function decryptPayload(b64Data) {
     try {
         const buffer = Buffer.from(b64Data, 'base64');
@@ -47,9 +51,8 @@ function encryptPayload(obj) {
     return combined.toString('base64');
 }
 
-// --- ADVANCED DEVICE SPOOFING & GPS JITTER LOGIC (Extracted from Python script) ---
+// --- ADVANCED DEVICE SPOOFING & GPS JITTER LOGIC ---
 function getMockLocation() {
-    // Adds a small random floating variation to avoid fixed location detection
     const lat = (23.385085 + (Math.random() - 0.5) * 0.004).toFixed(6);
     const lng = (85.286066 + (Math.random() - 0.5) * 0.004).toFixed(6);
     return { lat, lng };
@@ -92,7 +95,7 @@ function buildAppHeaders(sessionData = {}) {
     return headers;
 }
 
-// --- Universal Dynamic Handler matching app.js apiCall ---[span_3](start_span)[span_3](end_span)
+// --- Universal Dynamic Handler matching app.js apiCall ---
 app.post('/tata_bb_api_v2/', async (req, res) => {
     try {
         const { op, session_key, data } = req.body;
@@ -104,7 +107,6 @@ app.post('/tata_bb_api_v2/', async (req, res) => {
         let method = 'POST';
         let payloadBody = decodedData;
 
-        // Routing specific operations based on frontend needs[span_4](start_span)[span_4](end_span)
         if (op === 'validate_access_code') {
             const mockResponse = { ok: true, access_data: { code: decodedData.code, balance: 1000, per_order_limit: 50 }, features: {} };
             return res.json({ op, data: encryptPayload(mockResponse) });
@@ -125,7 +127,6 @@ app.post('/tata_bb_api_v2/', async (req, res) => {
             method = 'GET';
         }
 
-        // Build spoofed headers with randomised GPS location & device IDs
         const spoofedHeaders = buildAppHeaders(decodedData);
 
         const bbResponse = await fetch(targetUrl, {
@@ -150,7 +151,7 @@ app.post('/tata_bb_api_v2/', async (req, res) => {
     }
 });
 
-// --- Proxy for listing/search requests matching frontend proxyGet ---[span_5](start_span)[span_5](end_span)
+// --- Proxy for listing/search requests matching frontend proxyGet ---
 app.get('/bigbasket/proxy.php', async (req, res) => {
     try {
         const queryString = new URLSearchParams(req.query).toString();

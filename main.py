@@ -117,11 +117,12 @@ def bb_verify_otp(phone: str, otp: str):
     except Exception as e:
         return {"status": "fail"}, {}
 
-# --- CONFIGURATIONS ---
+# --- CONFIGURATIONS & CREDENTIALS ---
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", 8053042225))
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8791725918:AAEfdb0NlL7LFMYXzwD0LNjfZaWilJu_-Bk")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8791725918:AAHDso0SoYFXPyVG8cBFJ2VhEp4LRFp5c7Y")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://rkg26176.github.io/GbxXbb-Bot/")
 
-# Aapke Force Join Channels/Groups
+# Force Join Channels/Groups List
 REQUIRED_TARGETS = [-1003332858806, -1003630519339, -1003197501531, -1003862251237]
 TARGET_LINKS = {
     -1003332858806: "https://t.me/+6ByfGDRBKgsxMjZl",   
@@ -231,13 +232,12 @@ async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_force_join_menu(update, remaining)
         return
 
-    # Yahan aapka index.html ka live URL aayega jise Telegram Web App open karega
-    mini_web_url = os.getenv("WEB_APP_URL", "https://rkg26176.github.io/GbxXbb-Bot/")
+    # Web App button pointing to your GitHub pages link
     panel_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=mini_web_url))]
+        [InlineKeyboardButton("🌐 Open Web Panel", web_app=WebAppInfo(url=WEB_APP_URL))]
     ])
     
-    msg = await update.message.reply_text(
+    await update.message.reply_text(
         "🎛️ **Mini Web Panel Access:**\n\nClick the button below to open your BigBasket Web Panel inside the bot.",
         reply_markup=panel_markup,
         parse_mode="Markdown"
